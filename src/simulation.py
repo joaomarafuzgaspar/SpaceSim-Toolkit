@@ -5,6 +5,7 @@ from numba import jit  # FIXME: speeding up the code
 from tqdm import tqdm
 from utils import rmse
 from fcekf import FCEKF
+from hcmci import HCMCI
 from ccekf import EKF, CCEKF
 from scipy.linalg import block_diag
 from dynamics import SatelliteDynamics
@@ -16,6 +17,10 @@ def run_simulation(args):
     T = 395  # Duration [min]
     T_RMSE = 300  # Index from which the RMSE is calculated
     n_simulations = args.monte_carlo_sims  # Number of Monte-Carlo simulations
+    L = 1  # Number of consensus iterations
+    N = 4  # Number of satellites
+    gamma = N  # Consensus gain 1
+    pi = 1 / N  # Consensus gain 2
 
     # Initial state vector and state covariance
     if args.formation == 1:
@@ -159,8 +164,7 @@ def run_simulation(args):
             P = np.diag(initial_dev.reshape(-1) ** 2)
 
             for t in range(1, T):
-                x_new, P = fcekf.apply(dt, X_est[:, :, t - 1], P, Y[:, :, t])
-                X_est[:, :, t] = x_new
+                X_est[:, :, t], P = fcekf.apply(dt, X_est[:, :, t - 1], P, Y[:, :, t])
 
             # Compute RMSE
             rmse_chief_values.append(
@@ -190,7 +194,287 @@ def run_simulation(args):
                 np.linalg.norm(X_est[18:21, :, :] - X_true[18:21, :, :], axis=0)
             )
     elif args.algorithm == "hcmci":
-        raise NotImplementedError("HCMCI is not implemented yet.")
+        fcekf = FCEKF(Q, R)
+        chief_hcmci = HCMCI(np.linalg.inv(Q), np.linalg.inv(R))
+        deputy1_hcmci = HCMCI(np.linalg.inv(Q), np.linalg.inv(R))
+        deputy2_hcmci = HCMCI(np.linalg.inv(Q), np.linalg.inv(R))
+        deputy3_hcmci = HCMCI(np.linalg.inv(Q), np.linalg.inv(R))
+        for i in tqdm(range(n_simulations)):
+            # Observations
+            Y = np.zeros((9, 1, T))
+            for t in range(T):
+                Y[:, :, t] = np.concatenate(
+                    (
+                        fcekf.h_function_chief(X_true[:, :, t]),
+                        fcekf.h_function_deputy(X_true[:, :, t]),
+                    ),
+                    axis=0,
+                ) + np.random.normal(
+                    0, np.sqrt(np.diag(R)).reshape((9, 1)), size=(9, 1)
+                )
+
+            # Initial state vector and state covariance estimate
+            X_est = np.zeros_like(X_true)
+            X_est_chief = np.zeros_like(X_true)
+            X_est_deputy1 = np.zeros_like(X_true)
+            X_est_deputy2 = np.zeros_like(X_true)
+            X_est_deputy3 = np.zeros_like(X_true)
+            initial_dev = np.concatenate(
+                (
+                    p_pos_initial * np.random.randn(3, 1),
+                    p_vel_initial * np.random.randn(3, 1),
+                    p_pos_initial * np.random.randn(3, 1),
+                    p_vel_initial * np.random.randn(3, 1),
+                    p_pos_initial * np.random.randn(3, 1),
+                    p_vel_initial * np.random.randn(3, 1),
+                    p_pos_initial * np.random.randn(3, 1),
+                    p_vel_initial * np.random.randn(3, 1),
+                )
+            )
+            X_est[:, :, 0] = x_initial + initial_dev
+            X_est_chief[:, :, 0] = x_initial + initial_dev
+            X_est_deputy1[:, :, 0] = x_initial + initial_dev
+            X_est_deputy2[:, :, 0] = x_initial + initial_dev
+            X_est_deputy3[:, :, 0] = x_initial + initial_dev
+            Omega_chief = np.linalg.inv(np.diag(initial_dev.reshape(-1) ** 2))
+            Omega_deputy1 = np.linalg.inv(np.diag(initial_dev.reshape(-1) ** 2))
+            Omega_deputy2 = np.linalg.inv(np.diag(initial_dev.reshape(-1) ** 2))
+            Omega_deputy3 = np.linalg.inv(np.diag(initial_dev.reshape(-1) ** 2))
+
+            for t in range(1, T):
+                (
+                    q_chief,
+                    Omega_chief,
+                    delta_q_chief,
+                    delta_Omega_chief,
+                ) = chief_hcmci.prediction(
+                    dt, X_est_chief[:, :, t - 1], Omega_chief, Y[:, :, t]
+                )
+                (
+                    q_deputy1,
+                    Omega_deputy1,
+                    delta_q_deputy1,
+                    delta_Omega_deputy1,
+                ) = deputy1_hcmci.prediction(
+                    dt, X_est_deputy1[:, :, t - 1], Omega_deputy1, Y[:, :, t]
+                )
+                (
+                    q_deputy2,
+                    Omega_deputy2,
+                    delta_q_deputy2,
+                    delta_Omega_deputy2,
+                ) = deputy2_hcmci.prediction(
+                    dt, X_est_deputy2[:, :, t - 1], Omega_deputy2, Y[:, :, t]
+                )
+                (
+                    q_deputy3,
+                    Omega_deputy3,
+                    delta_q_deputy3,
+                    delta_Omega_deputy3,
+                ) = deputy3_hcmci.prediction(
+                    dt, X_est_deputy3[:, :, t - 1], Omega_deputy3, Y[:, :, t]
+                )
+
+                # Consensus
+                (
+                    delta_q_vec_chief,
+                    delta_Omega_vec_chief,
+                    q_vec_chief,
+                    Omega_vec_chief,
+                ) = chief_hcmci.init_consensus(
+                    delta_q_chief, delta_Omega_chief, q_chief, Omega_chief, L
+                )
+                (
+                    delta_q_vec_deputy1,
+                    delta_Omega_vec_deputy1,
+                    q_vec_deputy1,
+                    Omega_vec_deputy1,
+                ) = deputy1_hcmci.init_consensus(
+                    delta_q_deputy1, delta_Omega_deputy1, q_deputy1, Omega_deputy1, L
+                )
+                (
+                    delta_q_vec_deputy2,
+                    delta_Omega_vec_deputy2,
+                    q_vec_deputy2,
+                    Omega_vec_deputy2,
+                ) = deputy2_hcmci.init_consensus(
+                    delta_q_deputy2, delta_Omega_deputy2, q_deputy2, Omega_deputy2, L
+                )
+                (
+                    delta_q_vec_deputy3,
+                    delta_Omega_vec_deputy3,
+                    q_vec_deputy3,
+                    Omega_vec_deputy3,
+                ) = deputy3_hcmci.init_consensus(
+                    delta_q_deputy3, delta_Omega_deputy3, q_deputy3, Omega_deputy3, L
+                )
+
+                for l in range(1, L + 1):
+                    delta_q_vec_chief[:, :, l] = pi * (
+                        delta_q_vec_chief[:, :, l - 1]
+                        + delta_q_vec_deputy1[:, :, l - 1]
+                        + delta_q_vec_deputy2[:, :, l - 1]
+                        + delta_q_vec_deputy3[:, :, l - 1]
+                    )
+                    delta_q_vec_deputy1[:, :, l] = pi * (
+                        delta_q_vec_chief[:, :, l - 1]
+                        + delta_q_vec_deputy1[:, :, l - 1]
+                        + delta_q_vec_deputy2[:, :, l - 1]
+                        + delta_q_vec_deputy3[:, :, l - 1]
+                    )
+                    delta_q_vec_deputy2[:, :, l] = pi * (
+                        delta_q_vec_chief[:, :, l - 1]
+                        + delta_q_vec_deputy1[:, :, l - 1]
+                        + delta_q_vec_deputy2[:, :, l - 1]
+                        + delta_q_vec_deputy3[:, :, l - 1]
+                    )
+                    delta_q_vec_deputy3[:, :, l] = pi * (
+                        delta_q_vec_chief[:, :, l - 1]
+                        + delta_q_vec_deputy1[:, :, l - 1]
+                        + delta_q_vec_deputy2[:, :, l - 1]
+                        + delta_q_vec_deputy3[:, :, l - 1]
+                    )
+
+                    delta_Omega_vec_chief[:, :, l] = pi * (
+                        delta_Omega_vec_chief[:, :, l - 1]
+                        + delta_Omega_vec_deputy1[:, :, l - 1]
+                        + delta_Omega_vec_deputy2[:, :, l - 1]
+                        + delta_Omega_vec_deputy3[:, :, l - 1]
+                    )
+                    delta_Omega_vec_deputy1[:, :, l] = pi * (
+                        delta_Omega_vec_chief[:, :, l - 1]
+                        + delta_Omega_vec_deputy1[:, :, l - 1]
+                        + delta_Omega_vec_deputy2[:, :, l - 1]
+                        + delta_Omega_vec_deputy3[:, :, l - 1]
+                    )
+                    delta_Omega_vec_deputy2[:, :, l] = pi * (
+                        delta_Omega_vec_chief[:, :, l - 1]
+                        + delta_Omega_vec_deputy1[:, :, l - 1]
+                        + delta_Omega_vec_deputy2[:, :, l - 1]
+                        + delta_Omega_vec_deputy3[:, :, l - 1]
+                    )
+                    delta_Omega_vec_deputy3[:, :, l] = pi * (
+                        delta_Omega_vec_chief[:, :, l - 1]
+                        + delta_Omega_vec_deputy1[:, :, l - 1]
+                        + delta_Omega_vec_deputy2[:, :, l - 1]
+                        + delta_Omega_vec_deputy3[:, :, l - 1]
+                    )
+
+                    q_vec_chief[:, :, l] = pi * (
+                        q_vec_chief[:, :, l - 1]
+                        + q_vec_deputy1[:, :, l - 1]
+                        + q_vec_deputy2[:, :, l - 1]
+                        + q_vec_deputy3[:, :, l - 1]
+                    )
+                    q_vec_deputy1[:, :, l] = pi * (
+                        q_vec_chief[:, :, l - 1]
+                        + q_vec_deputy1[:, :, l - 1]
+                        + q_vec_deputy2[:, :, l - 1]
+                        + q_vec_deputy3[:, :, l - 1]
+                    )
+                    q_vec_deputy2[:, :, l] = pi * (
+                        q_vec_chief[:, :, l - 1]
+                        + q_vec_deputy1[:, :, l - 1]
+                        + q_vec_deputy2[:, :, l - 1]
+                        + q_vec_deputy3[:, :, l - 1]
+                    )
+                    q_vec_deputy3[:, :, l] = pi * (
+                        q_vec_chief[:, :, l - 1]
+                        + q_vec_deputy1[:, :, l - 1]
+                        + q_vec_deputy2[:, :, l - 1]
+                        + q_vec_deputy3[:, :, l - 1]
+                    )
+
+                    Omega_vec_chief[:, :, l] = pi * (
+                        Omega_vec_chief[:, :, l - 1]
+                        + Omega_vec_deputy1[:, :, l - 1]
+                        + Omega_vec_deputy2[:, :, l - 1]
+                        + Omega_vec_deputy3[:, :, l - 1]
+                    )
+                    Omega_vec_deputy1[:, :, l] = pi * (
+                        Omega_vec_chief[:, :, l - 1]
+                        + Omega_vec_deputy1[:, :, l - 1]
+                        + Omega_vec_deputy2[:, :, l - 1]
+                        + Omega_vec_deputy3[:, :, l - 1]
+                    )
+                    Omega_vec_deputy2[:, :, l] = pi * (
+                        Omega_vec_chief[:, :, l - 1]
+                        + Omega_vec_deputy1[:, :, l - 1]
+                        + Omega_vec_deputy2[:, :, l - 1]
+                        + Omega_vec_deputy3[:, :, l - 1]
+                    )
+                    Omega_vec_deputy3[:, :, l] = pi * (
+                        Omega_vec_chief[:, :, l - 1]
+                        + Omega_vec_deputy1[:, :, l - 1]
+                        + Omega_vec_deputy2[:, :, l - 1]
+                        + Omega_vec_deputy3[:, :, l - 1]
+                    )
+
+                X_est_chief[:, :, t], Omega_chief = chief_hcmci.correction(
+                    delta_q_vec_chief,
+                    delta_Omega_vec_chief,
+                    q_vec_chief,
+                    Omega_vec_chief,
+                    gamma,
+                )
+                X_est_deputy1[:, :, t], Omega_deputy1 = deputy1_hcmci.correction(
+                    delta_q_vec_deputy1,
+                    delta_Omega_vec_deputy1,
+                    q_vec_deputy1,
+                    Omega_vec_deputy1,
+                    gamma,
+                )
+                X_est_deputy2[:, :, t], Omega_deputy2 = deputy2_hcmci.correction(
+                    delta_q_vec_deputy2,
+                    delta_Omega_vec_deputy2,
+                    q_vec_deputy2,
+                    Omega_vec_deputy2,
+                    gamma,
+                )
+                X_est_deputy3[:, :, t], Omega_deputy3 = deputy3_hcmci.correction(
+                    delta_q_vec_deputy3,
+                    delta_Omega_vec_deputy3,
+                    q_vec_deputy3,
+                    Omega_vec_deputy3,
+                    gamma,
+                )
+                X_est[:, :, t] = np.concatenate(
+                    (
+                        X_est_chief[:6, :, t],
+                        X_est_deputy1[6:12, :, t],
+                        X_est_deputy2[12:18, :, t],
+                        X_est_deputy3[18:24, :, t],
+                    ),
+                    axis=0,
+                )
+
+            # Compute RMSE
+            rmse_chief_values.append(
+                rmse(X_est[:3, :, T_RMSE:], X_true[:3, :, T_RMSE:])
+            )
+            rmse_deputy1_values.append(
+                rmse(X_est[6:9, :, T_RMSE:], X_true[6:9, :, T_RMSE:])
+            )
+            rmse_deputy2_values.append(
+                rmse(X_est[12:15, :, T_RMSE:], X_true[12:15, :, T_RMSE:])
+            )
+            rmse_deputy3_values.append(
+                rmse(X_est[18:21, :, T_RMSE:], X_true[18:21, :, T_RMSE:])
+            )
+
+            # Compute deviation
+            dev_chief_values.append(
+                np.linalg.norm(X_est[:3, :, :] - X_true[:3, :, :], axis=0)
+            )
+            dev_deputy1_values.append(
+                np.linalg.norm(X_est[6:9, :, :] - X_true[6:9, :, :], axis=0)
+            )
+            dev_deputy2_values.append(
+                np.linalg.norm(X_est[12:15, :, :] - X_true[12:15, :, :], axis=0)
+            )
+            dev_deputy3_values.append(
+                np.linalg.norm(X_est[18:21, :, :] - X_true[18:21, :, :], axis=0)
+            )
     elif args.algorithm == "ccekf":
         fcekf = FCEKF(Q, R)
         chief_ekf = EKF(Q_chief, R_chief)

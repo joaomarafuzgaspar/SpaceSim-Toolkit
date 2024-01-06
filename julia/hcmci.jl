@@ -232,9 +232,9 @@ end
 
 # Simulation parameters
 dt = 60.0  # Time step [s]
-T = 3950  # Duration [min]
+T = 395  # Duration [min]
 T_RMSE = 301 # Index from which the RMSE is calculated
-n_simulations = 1  # Number of Monte-Carlo simulations
+n_simulations = 100  # Number of Monte-Carlo simulations
 L = 1  # Number of consensus iterations
 N = 4  # Number of satellites
 gamma = N  # Consensus gain 1
