@@ -1,43 +1,46 @@
-# SpaceSim-Toolkit
+# 🛰 SpaceSim-Toolkit
 
-## Overview
-SpaceSim-Toolkit is an open-source simulation framework designed for space enthusiasts, researchers, and engineers. It provides tools for simulating spacecraft dynamics, orbital mechanics, and navigation algorithms in various space missions.
-
-## Features
+## 🎯 Features
 - **Spacecraft Dynamics:** Detailed simulation of spacecraft motion and behavior.
 - **Orbital Mechanics:** Tools for analyzing and simulating orbital paths and maneuvers.
 - **Navigation Algorithms:** Advanced algorithms for space navigation and trajectory planning.
 
-## Getting Started
-1. **Installation:** Instructions on how to install and setup the toolkit.
-2. **Documentation:** Link to the full documentation for detailed guidance.
-3. **Examples:** Sample projects or scripts demonstrating the toolkit's capabilities.
+## 🚀 Index
+- 💡 [Description](#-description)
+- 💿 [Usage](#-usage)
+- 📖 [Documentation](#-documentation)
+- 🦆 [Example](#-example)
+- 📞 [Contact](#-contact)
+- 💥 [References](#-references)
 
-## Usage
-To use the SpaceSim-Toolkit, follow these steps:
+## 💡 Description
+**SpaceSim-Toolkit** is an open-source simulation framework designed for space enthusiasts, researchers, and engineers. It provides tools for simulating spacecraft dynamics, orbital mechanics, and navigation algorithms in various space missions. This code is based on <a href="#ref-1">[1]</a>.
 
-1. **Run Simulation**: 
-```
+## 💿 Usage
+To use the **SpaceSim-Toolkit**, follow these steps:
+```bash
+git clone git@github.com:joaomarafuzgaspar/SpaceSim-Toolkit.git
+
+cd SpaceSim-Toolkit
+
 python src/main.py
 ```
-2. **Command Line Arguments**:
-    - `-m` or `--matlab`: To display MATLAB figure.
-    - `-f` or `--formation`: Choose formation type (1 for VREx mission, 2 for higher-orbit).
-    - `-a` or `--algorithm`: Select navigation algorithm (fcekf, hcmci, or ccekf).
-    - `-M` or `--monte-carlo-sims`: Set number of Monte-Carlo simulations to run (integer >= 1).
 
-3. **Example Command**:
+## 📖 Documentation
+Alongside `python src/main.py` several command line arguments can be used as follows:
+- `-m` or `--matlab`: To display MATLAB figure.
+- `-f` or `--formation`: Choose formation type (1 for VREx mission, 2 for higher-orbit).
+- `-a` or `--algorithm`: Select navigation algorithm (fcekf, hcmci, or ccekf).
+- `-M` or `--monte-carlo-sims`: Set number of Monte-Carlo simulations to run (integer >= 1).
+
+## 🦆 Example
+This command runs 10 Monte-Carlo simulations using the `fcekf` algorithm for the VREx mission formation, with MATLAB visualization enabled.
 ```bash
-# This command runs 10 Monte-Carlo simulations using the fcekf algorithm for the VREx mission formation, with MATLAB visualization enabled.
-python script_name.py -m -f 1 -a fcekf -M 10
+python src/main.py -m -f 1 -a fcekf -M 10
 ```
 
-## Acknowledgements
-Credits to contributors, supporting organizations, or any other acknowledgements.
+## 📞 Contact
+**SpaceSim-Toolkit** is currently maintained by João Marafuz Gaspar ([joao.marafuz.gaspar@tecnico.ulisboa.pt](mailto:joao.marafuz.gaspar@tecnico.ulisboa.pt)).
 
-## Contact
-Information on how to get in touch with the project maintainers or contributors.
-
----
-
-For more information and the latest updates, visit the [SpaceSim-Toolkit GitHub repository](https://github.com/joaogaspar2001/SpaceSim-Toolkit).
+## 💥 References
+<a id="ref-1">[1]</a> João Marafuz Gaspar. 2024. *Collaborative Localization for Satellite Formations*. [online] Available [here](https://web.tecnico.ulisboa.pt/ist196240/thesis/JoaoMarafuzGaspar-PIC2-Report.pdf).
