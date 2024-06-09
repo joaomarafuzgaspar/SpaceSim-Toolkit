@@ -1,7 +1,7 @@
 import argparse
 
 from utils import run_visualizer
-from simulation import run_simulation
+from simulation import run_simulation, run_propagation
 
 
 class MatlabAction(argparse.Action):
@@ -56,9 +56,20 @@ def main():
         type=check_positive,
         help="Number of Monte-Carlo simulations to run (must be an integer >= 1)",
     )
+    parser.add_argument(
+        "-p",
+        "--propagate",
+        action="store_true",
+        help="Propagate the spacecraft dynamics using the dynamics model",
+    )
 
     # Parse arguments
     args = parser.parse_args()
+    
+    # Run propagation
+    if args.propagate and args.formation:
+        print(f"Propagating spacecraft dynamics for Formation {'I' if args.formation == 1 else 'II' if args.formation == 2 else 'Unknown'}...")
+        run_propagation(args)
 
     # Run simulation
     if args.monte_carlo_sims and args.formation and args.algorithm:

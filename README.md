@@ -32,8 +32,16 @@ Alongside `python src/main.py` several command line arguments can be used as fol
 - `-f` or `--formation`: Choose formation type (1 for VREx mission, 2 for higher-orbit).
 - `-a` or `--algorithm`: Select navigation algorithm (fcekf, hcmci, or ccekf).
 - `-M` or `--monte-carlo-sims`: Set number of Monte-Carlo simulations to run (integer >= 1).
+- `-p` or `--propagate`: Propagate the spacecraft dynamics using the dynamics model.
 
-## 🦆 Example
+## 🦆 Examples
+### Run propagation
+This command propagates the dynamics for the VREx mission formation.
+```bash
+python src/main.py -f 1 -p
+```
+
+### Run simulation
 This command runs 10 Monte-Carlo simulations using the `fcekf` algorithm for the VREx mission formation, with MATLAB visualization enabled.
 ```bash
 python src/main.py -m -f 1 -a fcekf -M 10

@@ -11,6 +11,92 @@ from scipy.linalg import block_diag
 from dynamics import SatelliteDynamics
 
 
+def run_propagation(args):
+    # Simulation parameters
+    dt = 60.0  # Time step [s]
+    T = 395  # Duration [min]
+
+    # Initial state vector and state covariance
+    if args.formation == 1:
+        # Formation Setup for REx-Lab Mission
+        x_initial = np.array(
+            [
+                6895.6,
+                0,
+                0,
+                0,
+                -0.99164,
+                7.5424,
+                6895.6,
+                3e-05,
+                1e-05,
+                -0.0015,
+                -0.99214,
+                7.5426,
+                6895.6,
+                1e-05,
+                3e-06,
+                0.005,
+                -0.98964,
+                7.5422,
+                6895.6,
+                -2e-05,
+                4e-06,
+                0.00545,
+                -0.99594,
+                7.5423,
+            ]
+        ).reshape(24, 1)
+    elif args.formation == 2:
+        # Formation Setup for Higher-Orbit Difference
+        x_initial = np.array(
+            [
+                -1295.9,
+                -929.67,
+                6793.4,
+                -7.4264,
+                0.1903,
+                -1.3906,
+                171.77,
+                6857.3,
+                -1281.5,
+                1.0068,
+                -1.3998,
+                -7.3585,
+                -4300.5,
+                1654.8,
+                -5241,
+                -4.6264,
+                3.4437,
+                4.8838,
+                -2197.8,
+                -3973.4,
+                -5298.7,
+                1.377,
+                5.6601,
+                -4.8155,
+            ]
+        ).reshape(24, 1)
+
+    # Get the true state vectors
+    X_true = np.zeros((24, 1, T))
+    X_true[:, :, 0] = x_initial
+    for i in range(T - 1):
+        X_true[:, :, i + 1] = SatelliteDynamics().x_new(dt, X_true[:, :, i])
+
+    data = np.column_stack(
+        (
+            X_true[:3, :, :].reshape(-1, 3),
+            X_true[6:9, :, :].reshape(-1, 3),
+            X_true[12:15, :, :].reshape(-1, 3),
+            X_true[18:21, :, :].reshape(-1, 3),
+        )
+    )
+    header = "x_chief,y_chief,z_chief,x_deputy1,y_deputy1,z_deputy1,x_deputy2,y_deputy2,z_deputy2,x_deputy3,y_deputy3,z_deputy3"
+    os.makedirs(os.path.dirname("data/data_x_true.csv"), exist_ok=True)
+    np.savetxt("data/data_x_true.csv", data, delimiter=",", header=header, comments="")
+
+
 def run_simulation(args):
     # Simulation parameters
     dt = 60.0  # Time step [s]
