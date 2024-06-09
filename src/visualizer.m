@@ -1,6 +1,6 @@
 close all
 
-data = readtable('../data/data.csv');
+data = readtable('data/data.csv');
 
 % Simulation parameters
 dt = 60.0; % Time step [s]

@@ -28,7 +28,7 @@ python src/main.py
 
 ## 📖 Documentation
 Alongside `python src/main.py` several command line arguments can be used as follows:
-- `-m` or `--matlab`: To display MATLAB figure.
+- `-m` or `--matlab`: To display MATLAB figure(s).
 - `-f` or `--formation`: Choose formation type (1 for VREx mission, 2 for higher-orbit).
 - `-a` or `--algorithm`: Select navigation algorithm (fcekf, hcmci, or ccekf).
 - `-M` or `--monte-carlo-sims`: Set number of Monte-Carlo simulations to run (integer >= 1).

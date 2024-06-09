@@ -4,6 +4,16 @@ from utils import run_visualizer
 from simulation import run_simulation
 
 
+class MatlabAction(argparse.Action):
+    def __call__(self, parser, namespace, values, option_string=None):
+        if values is None:
+            # If no value is provided, set a flag (e.g., True)
+            setattr(namespace, self.dest, True)
+        else:
+            # If a value is provided, use it
+            setattr(namespace, self.dest, values)
+
+
 def check_positive(value):
     ivalue = int(value)
     if ivalue < 1:
@@ -17,14 +27,20 @@ def main():
         description="SpaceSim-Toolkit is an advanced, open-source simulation framework designed for space enthusiasts, researchers, and engineers. This versatile toolkit focuses on providing a robust platform for simulating spacecraft dynamics, orbital mechanics, and navigation algorithms in various space missions and scenarios."
     )
     parser.add_argument(
-        "-m", "--matlab", action="store_true", help="Display MATLAB figure"
+        "-m",
+        "--matlab",
+        nargs="?",  # '?' allows the argument to be optional
+        default=None,
+        const=True,  # If the argument is provided without a value, set it to True
+        choices=[None, "all"],
+        action=MatlabAction,
+        help="Display MATLAB figure(s); use 'all' to display all figures.",
     )
     parser.add_argument(
         "-f",
         "--formation",
         type=int,
         choices=[1, 2],
-        default=1,
         help="Formation to simulate (1 for VREx mission formation or 2 for higher-orbit difference formation)",
     )
     parser.add_argument(
@@ -32,14 +48,12 @@ def main():
         "--algorithm",
         type=str,
         choices=["fcekf", "hcmci", "ccekf"],
-        default="fcekf",
         help="Navigation algorithm to simulate (fcekf for FCEKF, hcmci for HCMCI, or ccekf for CCEKF)",
     )
     parser.add_argument(
         "-M",
         "--monte-carlo-sims",
         type=check_positive,
-        default=1,
         help="Number of Monte-Carlo simulations to run (must be an integer >= 1)",
     )
 
@@ -47,13 +61,17 @@ def main():
     args = parser.parse_args()
 
     # Run simulation
-    print(
-        f"Running {args.monte_carlo_sims} Monte-Carlo simulations for Formation {'I' if args.formation == 1 else 'II' if args.formation == 2 else 'Unknown'} with Algorithm {args.algorithm}..."
-    )
-    run_simulation(args)
+    if args.monte_carlo_sims and args.formation and args.algorithm:
+        print(
+            f"Running {args.monte_carlo_sims} Monte-Carlo simulations for Formation {'I' if args.formation == 1 else 'II' if args.formation == 2 else 'Unknown'} with Algorithm {args.algorithm}..."
+        )
+        run_simulation(args)
 
     # Check if the MATLAB flag is set
-    if args.matlab:
+    if args.matlab == "all":
+        print("Displaying MATLAB figures for all algorithms...")
+        run_visualizer(all=True)
+    elif args.matlab:
         print("Displaying MATLAB figure...")
         run_visualizer()
 

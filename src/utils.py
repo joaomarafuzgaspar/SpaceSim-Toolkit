@@ -9,7 +9,7 @@ def rmse(X_est, X_true):
     )
 
 
-def run_visualizer():
+def run_visualizer(all=False):
     # Start MATLAB engine
     eng = matlab.engine.start_matlab()
 
@@ -20,10 +20,16 @@ def run_visualizer():
     eng.addpath(matlab_functions_path, nargout=0)
 
     # Call the visualizer script
-    try:
-        eng.visualizer(nargout=0)
-    except matlab.engine.MatlabExecutionError as e:
-        print(f"An error occurred: {e}")
+    if all:
+        try:
+            eng.visualizer_all(nargout=0)
+        except matlab.engine.MatlabExecutionError as e:
+            print(f"An error occurred: {e}")
+    else:
+        try:
+            eng.visualizer(nargout=0)
+        except matlab.engine.MatlabExecutionError as e:
+            print(f"An error occurred: {e}")
 
     # Quit the MATLAB engine
     eng.quit()
