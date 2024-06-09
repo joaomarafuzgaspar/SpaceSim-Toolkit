@@ -9,7 +9,7 @@ def rmse(X_est, X_true):
     )
 
 
-def run_visualizer(all=False):
+def run_visualizer(to_display):
     # Start MATLAB engine
     eng = matlab.engine.start_matlab()
 
@@ -20,7 +20,12 @@ def run_visualizer(all=False):
     eng.addpath(matlab_functions_path, nargout=0)
 
     # Call the visualizer script
-    if all:
+    if to_display == "orbits":
+        try:
+            eng.visualizer_orbits(nargout=0)
+        except matlab.engine.MatlabExecutionError as e:
+            print(f"An error occurred: {e}")
+    elif to_display == "all_deviations":
         try:
             eng.visualizer_all(nargout=0)
         except matlab.engine.MatlabExecutionError as e:

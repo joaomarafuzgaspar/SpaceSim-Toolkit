@@ -14,7 +14,7 @@ from dynamics import SatelliteDynamics
 def run_propagation(args):
     # Simulation parameters
     dt = 60.0  # Time step [s]
-    T = 395  # Duration [min]
+    T = 360  # Duration [min]
 
     # Initial state vector and state covariance
     if args.formation == 1:
@@ -79,17 +79,25 @@ def run_propagation(args):
         ).reshape(24, 1)
 
     # Get the true state vectors
-    X_true = np.zeros((24, 1, T))
+    X_true = np.zeros((24, 1, T + 1))
     X_true[:, :, 0] = x_initial
-    for i in range(T - 1):
+    for i in range(T):
         X_true[:, :, i + 1] = SatelliteDynamics().x_new(dt, X_true[:, :, i])
 
     data = np.column_stack(
         (
-            X_true[:3, :, :].reshape(-1, 3),
-            X_true[6:9, :, :].reshape(-1, 3),
-            X_true[12:15, :, :].reshape(-1, 3),
-            X_true[18:21, :, :].reshape(-1, 3),
+            X_true[0, :, :].reshape(-1, 1),
+            X_true[1, :, :].reshape(-1, 1),
+            X_true[2, :, :].reshape(-1, 1),
+            X_true[6, :, :].reshape(-1, 1),
+            X_true[7, :, :].reshape(-1, 1),
+            X_true[8, :, :].reshape(-1, 1),
+            X_true[12, :, :].reshape(-1, 1),
+            X_true[13, :, :].reshape(-1, 1),
+            X_true[14, :, :].reshape(-1, 1),
+            X_true[18, :, :].reshape(-1, 1),
+            X_true[19, :, :].reshape(-1, 1),
+            X_true[20, :, :].reshape(-1, 1),
         )
     )
     header = "x_chief,y_chief,z_chief,x_deputy1,y_deputy1,z_deputy1,x_deputy2,y_deputy2,z_deputy2,x_deputy3,y_deputy3,z_deputy3"

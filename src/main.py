@@ -32,9 +32,9 @@ def main():
         nargs="?",  # '?' allows the argument to be optional
         default=None,
         const=True,  # If the argument is provided without a value, set it to True
-        choices=[None, "all"],
+        choices=[None, "all_deviations", "orbits"],
         action=MatlabAction,
-        help="Display MATLAB figure(s); use 'all' to display all figures.",
+        help="Display MATLAB figure(s); use 'all' to display all algorithms estimates deviations and 'orbits' to display the orbits.",
     )
     parser.add_argument(
         "-f",
@@ -79,11 +79,14 @@ def main():
         run_simulation(args)
 
     # Check if the MATLAB flag is set
-    if args.matlab == "all":
-        print("Displaying MATLAB figures for all algorithms...")
-        run_visualizer(all=True)
+    if args.matlab == "orbits":
+        print("Displaying MATLAB figure with the orbits...")
+        run_visualizer(to_display="orbits")
+    elif args.matlab == "all":
+        print("Displaying MATLAB figures for all algorithms estimates deviations...")
+        run_visualizer(to_display="all_deviations")
     elif args.matlab:
-        print("Displaying MATLAB figure...")
+        print("Displaying MATLAB figure with algorithm estimate deviation...")
         run_visualizer()
 
 

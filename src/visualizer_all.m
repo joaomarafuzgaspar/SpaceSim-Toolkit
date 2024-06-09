@@ -26,8 +26,8 @@ centerY = screenHeight / 2;
 positions = [
     centerX - figWidth, centerY, figWidth, figHeight;
     centerX, centerY, figWidth, figHeight;
-    centerX - figWidth, centerY - figHeight, figWidth, figHeight;
-    centerX, centerY - figHeight, figWidth, figHeight;
+    centerX - figWidth, centerY - (figHeight + 80), figWidth, figHeight;
+    centerX, centerY - (figHeight + 80), figWidth, figHeight;
     ];
 
 
