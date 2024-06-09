@@ -633,5 +633,5 @@ def run_simulation(args):
         )
     )
     header = "dev_chief,dev_deputy1,dev_deputy2,dev_deputy3"
-    os.makedirs(os.path.dirname("../data/data.csv"), exist_ok=True)
-    np.savetxt("../data/data.csv", data, delimiter=",", header=header, comments="")
+    os.makedirs(os.path.dirname("data/data.csv"), exist_ok=True)
+    np.savetxt("data/data.csv", data, delimiter=",", header=header, comments="")
