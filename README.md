@@ -61,7 +61,7 @@ python src/main.py -m -f 1 -a fcekf -M 10
 </div>
 
 <p align="center">
-    <img src="/gifs/orbits_form1.gif" width="400">
+    <img src="/gifs/orbits_form1.gif" width="600">
 </p>
 
 #### Formation II - Higher orbital difference
@@ -78,7 +78,7 @@ python src/main.py -m -f 1 -a fcekf -M 10
 </div>
 
 <p align="center">
-    <img src="/gifs/orbits_form2.gif" width="400">
+    <img src="/gifs/orbits_form2.gif" width="600">
 </p>
 
 ## 📞 Contact
