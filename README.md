@@ -36,7 +36,7 @@ Alongside `python src/main.py` several command line arguments can be used as fol
 
 ## 🦆 Examples
 ### Run propagation
-This command propagates the dynamics for the V-R3x mission formation.
+This command propagates the dynamics for the V-R3x mission formation and saves the evolution of the state vectors and Jacobians.
 ```bash
 python src/main.py -f 1 -p
 ```
@@ -48,7 +48,7 @@ python src/main.py -m -f 1 -a fcekf -M 10
 ```
 
 ### Orbits of the available formations
-#### Formation I - V-R3x mission
+#### Formation I - V-R3x Mission
 
 <div align="center">
 
@@ -64,7 +64,7 @@ python src/main.py -m -f 1 -a fcekf -M 10
     <img src="/gifs/orbits_form1.gif" width="600">
 </p>
 
-#### Formation II - Higher orbital difference
+#### Formation II - Higher Orbit Difference
 
 <div align="center">
 

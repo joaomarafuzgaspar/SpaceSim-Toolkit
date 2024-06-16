@@ -1,5 +1,6 @@
 import os
 import numpy as np
+import pandas as pd
 
 from numba import jit  # FIXME: speeding up the code
 from tqdm import tqdm
@@ -49,42 +50,75 @@ def run_propagation(args):
         ).reshape(24, 1)
     elif args.formation == 2:
         # Formation Setup for Higher-Orbit Difference
+        # x_initial = np.array(
+        #     [
+        #         -1295.9,
+        #         -929.67,
+        #         6793.4,
+        #         -7.4264,
+        #         0.1903,
+        #         -1.3906,
+        #         171.77,
+        #         6857.3,
+        #         -1281.5,
+        #         1.0068,
+        #         -1.3998,
+        #         -7.3585,
+        #         -4300.5,
+        #         1654.8,
+        #         -5241,
+        #         -4.6264,
+        #         3.4437,
+        #         4.8838,
+        #         -2197.8,
+        #         -3973.4,
+        #         -5298.7,
+        #         1.377,
+        #         5.6601,
+        #         -4.8155,
+        #     ]
+        # ).reshape(24, 1)
+
         x_initial = np.array(
             [
-                -1295.9,
-                -929.67,
-                6793.4,
-                -7.4264,
-                0.1903,
-                -1.3906,
-                171.77,
-                6857.3,
-                -1281.5,
-                1.0068,
-                -1.3998,
-                -7.3585,
-                -4300.5,
-                1654.8,
-                -5241,
-                -4.6264,
-                3.4437,
-                4.8838,
-                -2197.8,
-                -3973.4,
-                -5298.7,
-                1.377,
-                5.6601,
-                -4.8155,
+                -1295.584507660883,
+                -929.374090790716,
+                6793.411681382508,
+                -7.426511598857044,
+                0.1901977700449196,
+                -1.390296386102339,
+                -171.9053207863305,
+                6857.222886707187,
+                -1281.649066658106,
+                1.00700996311517,
+                -1.399928822038102,
+                -7.358476293144188,
+                -4251.965594108594,
+                1619.96360478974,
+                -5291.008175332099,
+                -4.678160885930184,
+                3.46354521932496,
+                4.820200886960163,
+                -2214.904606485801,
+                -3967.018695794123,
+                -5296.066519714539,
+                1.361455163361585,
+                5.66586154474086,
+                -4.813337608337905,
             ]
         ).reshape(24, 1)
 
-    # Get the true state vectors
+    # Get the true state vectors and Jacobians
     X_true = np.zeros((24, 1, T + 1))
     X_true[:, :, 0] = x_initial
+    F = np.zeros((24, 24, T + 1))
+    F[:, :, 0] = SatelliteDynamics().F_jacobian(x_initial)
     for i in range(T):
         X_true[:, :, i + 1] = SatelliteDynamics().x_new(dt, X_true[:, :, i])
+        F[:, :, i + 1] = SatelliteDynamics().F_jacobian(X_true[:, :, i + 1])
 
-    data = np.column_stack(
+    header = "x_chief,y_chief,z_chief,x_deputy1,y_deputy1,z_deputy1,x_deputy2,y_deputy2,z_deputy2,x_deputy3,y_deputy3,z_deputy3"
+    data_x_true = np.column_stack(
         (
             X_true[0, :, :].reshape(-1, 1),
             X_true[1, :, :].reshape(-1, 1),
@@ -100,9 +134,32 @@ def run_propagation(args):
             X_true[20, :, :].reshape(-1, 1),
         )
     )
-    header = "x_chief,y_chief,z_chief,x_deputy1,y_deputy1,z_deputy1,x_deputy2,y_deputy2,z_deputy2,x_deputy3,y_deputy3,z_deputy3"
-    os.makedirs(os.path.dirname("data/data_x_true.csv"), exist_ok=True)
-    np.savetxt("data/data_x_true.csv", data, delimiter=",", header=header, comments="")
+    os.makedirs("data", exist_ok=True)
+    np.savetxt(
+        "data/data_x_true.csv", data_x_true, delimiter=",", header=header, comments=""
+    )
+
+    def extract_and_serialize_submatrices(F):
+        submatrices = []
+        for i in range(0, 24, 6):
+            submatrix = F[i : i + 6, i : i + 6]
+            submatrices.append(submatrix)
+        return submatrices
+    extracted_data = [
+        extract_and_serialize_submatrices(F[:, :, t]) for t in range(T + 1)
+    ]
+    columns = ["F_chief", "F_deputy1", "F_deputy2", "F_deputy3"]
+    matrix_evolution = {col: [] for col in columns}
+    for matrices in extracted_data:
+        for idx, matrix in enumerate(matrices):
+            matrix_evolution[columns[idx]].append(matrix.flatten())
+    df = pd.DataFrame(
+        {
+            col: [" ".join(map(str, row)) for row in matrix_evolution[col]]
+            for col in columns
+        }
+    )
+    df.to_csv("data/data_F.csv", index=False)
 
 
 def run_simulation(args):
