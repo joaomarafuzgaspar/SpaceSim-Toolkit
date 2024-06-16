@@ -1,0 +1,335 @@
+%General Mission Analysis Tool(GMAT) Script
+%Created: 2024-06-10 09:49:35
+
+
+%----------------------------------------
+%---------- Spacecraft
+%----------------------------------------
+
+Create Spacecraft Chief1;
+GMAT Chief1.DateFormat = TAIModJulian;
+GMAT Chief1.Epoch = '21545';
+GMAT Chief1.CoordinateSystem = EarthMJ2000Eq;
+GMAT Chief1.DisplayStateType = Keplerian;
+GMAT Chief1.SMA = 6977.999999999986;
+GMAT Chief1.ECC = 2.600000001171564e-06;
+GMAT Chief1.INC = 97.79000000000001;
+GMAT Chief1.RAAN = 1.50322362308627e-05;
+GMAT Chief1.AOP = 303.3399999960843;
+GMAT Chief1.TA = 157.360000003916;
+GMAT Chief1.DryMass = 1;
+GMAT Chief1.Cd = 2.22;
+GMAT Chief1.Cr = 1.8;
+GMAT Chief1.DragArea = 0.0001;
+GMAT Chief1.SRPArea = 1;
+GMAT Chief1.SPADDragScaleFactor = 1;
+GMAT Chief1.SPADSRPScaleFactor = 1;
+GMAT Chief1.AtmosDensityScaleFactor = 1;
+GMAT Chief1.ExtendedMassPropertiesModel = 'None';
+GMAT Chief1.NAIFId = -10002001;
+GMAT Chief1.NAIFIdReferenceFrame = -9002001;
+GMAT Chief1.OrbitColor = Red;
+GMAT Chief1.TargetColor = Teal;
+GMAT Chief1.OrbitErrorCovariance = [ 1e+70 0 0 0 0 0 ; 0 1e+70 0 0 0 0 ; 0 0 1e+70 0 0 0 ; 0 0 0 1e+70 0 0 ; 0 0 0 0 1e+70 0 ; 0 0 0 0 0 1e+70 ];
+GMAT Chief1.CdSigma = 1e+70;
+GMAT Chief1.CrSigma = 1e+70;
+GMAT Chief1.Id = 'SatId';
+GMAT Chief1.Attitude = CoordinateSystemFixed;
+GMAT Chief1.SPADSRPInterpolationMethod = Bilinear;
+GMAT Chief1.SPADSRPScaleFactorSigma = 1e+70;
+GMAT Chief1.SPADDragInterpolationMethod = Bilinear;
+GMAT Chief1.SPADDragScaleFactorSigma = 1e+70;
+GMAT Chief1.AtmosDensityScaleFactorSigma = 1e+70;
+GMAT Chief1.ModelFile = 'aura.3ds';
+GMAT Chief1.ModelOffsetX = 0;
+GMAT Chief1.ModelOffsetY = 0;
+GMAT Chief1.ModelOffsetZ = 0;
+GMAT Chief1.ModelRotationX = 0;
+GMAT Chief1.ModelRotationY = 0;
+GMAT Chief1.ModelRotationZ = 0;
+GMAT Chief1.ModelScale = 1;
+GMAT Chief1.AttitudeDisplayStateType = 'Quaternion';
+GMAT Chief1.AttitudeRateDisplayStateType = 'AngularVelocity';
+GMAT Chief1.AttitudeCoordinateSystem = EarthMJ2000Eq;
+GMAT Chief1.EulerAngleSequence = '321';
+
+Create Spacecraft Deputy1;
+GMAT Deputy1.DateFormat = TAIModJulian;
+GMAT Deputy1.Epoch = '21545';
+GMAT Deputy1.CoordinateSystem = EarthMJ2000Eq;
+GMAT Deputy1.DisplayStateType = Keplerian;
+GMAT Deputy1.SMA = 6977.999999999989;
+GMAT Deputy1.ECC = 0.006480000000001599;
+GMAT Deputy1.INC = 97.26000000000001;
+GMAT Deputy1.RAAN = 272.8;
+GMAT Deputy1.AOP = 281.1500000000096;
+GMAT Deputy1.TA = 269.5199999999901;
+GMAT Deputy1.DryMass = 1;
+GMAT Deputy1.Cd = 2.22;
+GMAT Deputy1.Cr = 1.8;
+GMAT Deputy1.DragArea = 0.0001;
+GMAT Deputy1.SRPArea = 1;
+GMAT Deputy1.SPADDragScaleFactor = 1;
+GMAT Deputy1.SPADSRPScaleFactor = 1;
+GMAT Deputy1.AtmosDensityScaleFactor = 1;
+GMAT Deputy1.ExtendedMassPropertiesModel = 'None';
+GMAT Deputy1.NAIFId = -10002001;
+GMAT Deputy1.NAIFIdReferenceFrame = -9002001;
+GMAT Deputy1.OrbitColor = Red;
+GMAT Deputy1.TargetColor = Teal;
+GMAT Deputy1.OrbitErrorCovariance = [ 1e+70 0 0 0 0 0 ; 0 1e+70 0 0 0 0 ; 0 0 1e+70 0 0 0 ; 0 0 0 1e+70 0 0 ; 0 0 0 0 1e+70 0 ; 0 0 0 0 0 1e+70 ];
+GMAT Deputy1.CdSigma = 1e+70;
+GMAT Deputy1.CrSigma = 1e+70;
+GMAT Deputy1.Id = 'SatId';
+GMAT Deputy1.Attitude = CoordinateSystemFixed;
+GMAT Deputy1.SPADSRPInterpolationMethod = Bilinear;
+GMAT Deputy1.SPADSRPScaleFactorSigma = 1e+70;
+GMAT Deputy1.SPADDragInterpolationMethod = Bilinear;
+GMAT Deputy1.SPADDragScaleFactorSigma = 1e+70;
+GMAT Deputy1.AtmosDensityScaleFactorSigma = 1e+70;
+GMAT Deputy1.ModelFile = 'aura.3ds';
+GMAT Deputy1.ModelOffsetX = 0;
+GMAT Deputy1.ModelOffsetY = 0;
+GMAT Deputy1.ModelOffsetZ = 0;
+GMAT Deputy1.ModelRotationX = 0;
+GMAT Deputy1.ModelRotationY = 0;
+GMAT Deputy1.ModelRotationZ = 0;
+GMAT Deputy1.ModelScale = 1;
+GMAT Deputy1.AttitudeDisplayStateType = 'Quaternion';
+GMAT Deputy1.AttitudeRateDisplayStateType = 'AngularVelocity';
+GMAT Deputy1.AttitudeCoordinateSystem = EarthMJ2000Eq;
+GMAT Deputy1.EulerAngleSequence = '321';
+
+Create Spacecraft Deputy2;
+GMAT Deputy2.DateFormat = TAIModJulian;
+GMAT Deputy2.Epoch = '21545';
+GMAT Deputy2.CoordinateSystem = EarthMJ2000Eq;
+GMAT Deputy2.DisplayStateType = Keplerian;
+GMAT Deputy2.SMA = 6978.000000000001;
+GMAT Deputy2.ECC = 6.60000000009135e-05;
+GMAT Deputy2.INC = 97.79000000000001;
+GMAT Deputy2.RAAN = 149.99;
+GMAT Deputy2.AOP = 104.0699999980606;
+GMAT Deputy2.TA = 206.0000000018577;
+GMAT Deputy2.DryMass = 1;
+GMAT Deputy2.Cd = 2.22;
+GMAT Deputy2.Cr = 1.8;
+GMAT Deputy2.DragArea = 0.0001;
+GMAT Deputy2.SRPArea = 1;
+GMAT Deputy2.SPADDragScaleFactor = 1;
+GMAT Deputy2.SPADSRPScaleFactor = 1;
+GMAT Deputy2.AtmosDensityScaleFactor = 1;
+GMAT Deputy2.ExtendedMassPropertiesModel = 'None';
+GMAT Deputy2.NAIFId = -10002001;
+GMAT Deputy2.NAIFIdReferenceFrame = -9002001;
+GMAT Deputy2.OrbitColor = Red;
+GMAT Deputy2.TargetColor = Teal;
+GMAT Deputy2.OrbitErrorCovariance = [ 1e+70 0 0 0 0 0 ; 0 1e+70 0 0 0 0 ; 0 0 1e+70 0 0 0 ; 0 0 0 1e+70 0 0 ; 0 0 0 0 1e+70 0 ; 0 0 0 0 0 1e+70 ];
+GMAT Deputy2.CdSigma = 1e+70;
+GMAT Deputy2.CrSigma = 1e+70;
+GMAT Deputy2.Id = 'SatId';
+GMAT Deputy2.Attitude = CoordinateSystemFixed;
+GMAT Deputy2.SPADSRPInterpolationMethod = Bilinear;
+GMAT Deputy2.SPADSRPScaleFactorSigma = 1e+70;
+GMAT Deputy2.SPADDragInterpolationMethod = Bilinear;
+GMAT Deputy2.SPADDragScaleFactorSigma = 1e+70;
+GMAT Deputy2.AtmosDensityScaleFactorSigma = 1e+70;
+GMAT Deputy2.ModelFile = 'aura.3ds';
+GMAT Deputy2.ModelOffsetX = 0;
+GMAT Deputy2.ModelOffsetY = 0;
+GMAT Deputy2.ModelOffsetZ = 0;
+GMAT Deputy2.ModelRotationX = 0;
+GMAT Deputy2.ModelRotationY = 0;
+GMAT Deputy2.ModelRotationZ = 0;
+GMAT Deputy2.ModelScale = 1;
+GMAT Deputy2.AttitudeDisplayStateType = 'Quaternion';
+GMAT Deputy2.AttitudeRateDisplayStateType = 'AngularVelocity';
+GMAT Deputy2.AttitudeCoordinateSystem = EarthMJ2000Eq;
+GMAT Deputy2.EulerAngleSequence = '321';
+
+Create Spacecraft Deputy3;
+GMAT Deputy3.DateFormat = TAIModJulian;
+GMAT Deputy3.Epoch = '21545';
+GMAT Deputy3.CoordinateSystem = EarthMJ2000Eq;
+GMAT Deputy3.DisplayStateType = Keplerian;
+GMAT Deputy3.SMA = 6977.999999999995;
+GMAT Deputy3.ECC = 1.299999999917009e-05;
+GMAT Deputy3.INC = 97.79000000000001;
+GMAT Deputy3.RAAN = 70;
+GMAT Deputy3.AOP = 257.4299999873311;
+GMAT Deputy3.TA = 332.5700000126689;
+GMAT Deputy3.DryMass = 1;
+GMAT Deputy3.Cd = 2.22;
+GMAT Deputy3.Cr = 1.8;
+GMAT Deputy3.DragArea = 0.0001;
+GMAT Deputy3.SRPArea = 1;
+GMAT Deputy3.SPADDragScaleFactor = 1;
+GMAT Deputy3.SPADSRPScaleFactor = 1;
+GMAT Deputy3.AtmosDensityScaleFactor = 1;
+GMAT Deputy3.ExtendedMassPropertiesModel = 'None';
+GMAT Deputy3.NAIFId = -10002001;
+GMAT Deputy3.NAIFIdReferenceFrame = -9002001;
+GMAT Deputy3.OrbitColor = Red;
+GMAT Deputy3.TargetColor = Teal;
+GMAT Deputy3.OrbitErrorCovariance = [ 1e+70 0 0 0 0 0 ; 0 1e+70 0 0 0 0 ; 0 0 1e+70 0 0 0 ; 0 0 0 1e+70 0 0 ; 0 0 0 0 1e+70 0 ; 0 0 0 0 0 1e+70 ];
+GMAT Deputy3.CdSigma = 1e+70;
+GMAT Deputy3.CrSigma = 1e+70;
+GMAT Deputy3.Id = 'SatId';
+GMAT Deputy3.Attitude = CoordinateSystemFixed;
+GMAT Deputy3.SPADSRPInterpolationMethod = Bilinear;
+GMAT Deputy3.SPADSRPScaleFactorSigma = 1e+70;
+GMAT Deputy3.SPADDragInterpolationMethod = Bilinear;
+GMAT Deputy3.SPADDragScaleFactorSigma = 1e+70;
+GMAT Deputy3.AtmosDensityScaleFactorSigma = 1e+70;
+GMAT Deputy3.ModelFile = 'aura.3ds';
+GMAT Deputy3.ModelOffsetX = 0;
+GMAT Deputy3.ModelOffsetY = 0;
+GMAT Deputy3.ModelOffsetZ = 0;
+GMAT Deputy3.ModelRotationX = 0;
+GMAT Deputy3.ModelRotationY = 0;
+GMAT Deputy3.ModelRotationZ = 0;
+GMAT Deputy3.ModelScale = 1;
+GMAT Deputy3.AttitudeDisplayStateType = 'Quaternion';
+GMAT Deputy3.AttitudeRateDisplayStateType = 'AngularVelocity';
+GMAT Deputy3.AttitudeCoordinateSystem = EarthMJ2000Eq;
+GMAT Deputy3.EulerAngleSequence = '321';
+
+
+
+
+
+
+
+%----------------------------------------
+%---------- ForceModels
+%----------------------------------------
+
+Create ForceModel Propagator_ForceModel;
+GMAT Propagator_ForceModel.CentralBody = Earth;
+GMAT Propagator_ForceModel.PrimaryBodies = {Earth};
+GMAT Propagator_ForceModel.SRP = Off;
+GMAT Propagator_ForceModel.RelativisticCorrection = Off;
+GMAT Propagator_ForceModel.ErrorControl = RSSStep;
+GMAT Propagator_ForceModel.GravityField.Earth.Degree = 2;
+GMAT Propagator_ForceModel.GravityField.Earth.Order = 2;
+GMAT Propagator_ForceModel.GravityField.Earth.StmLimit = 2;
+GMAT Propagator_ForceModel.GravityField.Earth.PotentialFile = 'JGM2.cof';
+GMAT Propagator_ForceModel.GravityField.Earth.TideModel = 'None';
+GMAT Propagator_ForceModel.Drag.AtmosphereModel = JacchiaRoberts;
+GMAT Propagator_ForceModel.Drag.HistoricWeatherSource = 'ConstantFluxAndGeoMag';
+GMAT Propagator_ForceModel.Drag.PredictedWeatherSource = 'ConstantFluxAndGeoMag';
+GMAT Propagator_ForceModel.Drag.CSSISpaceWeatherFile = 'SpaceWeather-All-v1.2.txt';
+GMAT Propagator_ForceModel.Drag.SchattenFile = 'SchattenPredict.txt';
+GMAT Propagator_ForceModel.Drag.F107 = 150;
+GMAT Propagator_ForceModel.Drag.F107A = 150;
+GMAT Propagator_ForceModel.Drag.MagneticIndex = 3;
+GMAT Propagator_ForceModel.Drag.SchattenErrorModel = 'Nominal';
+GMAT Propagator_ForceModel.Drag.SchattenTimingModel = 'NominalCycle';
+GMAT Propagator_ForceModel.Drag.DragModel = 'Spherical';
+
+%----------------------------------------
+%---------- Propagators
+%----------------------------------------
+
+Create Propagator Propagator;
+GMAT Propagator.FM = Propagator_ForceModel;
+GMAT Propagator.Type = RungeKutta4;
+GMAT Propagator.InitialStepSize = 60;
+GMAT Propagator.Accuracy = 9.999999999999999e-12;
+GMAT Propagator.MinStep = 60;
+GMAT Propagator.MaxStep = 60;
+GMAT Propagator.MaxStepAttempts = 50;
+GMAT Propagator.StopIfAccuracyIsViolated = true;
+
+%----------------------------------------
+%---------- Subscribers
+%----------------------------------------
+
+Create OrbitView OrbitView;
+GMAT OrbitView.SolverIterations = Current;
+GMAT OrbitView.UpperLeft = [ 0.002735229759299781 0 ];
+GMAT OrbitView.Size = [ 0.5650984682713348 0.5759615384615384 ];
+GMAT OrbitView.RelativeZOrder = 92;
+GMAT OrbitView.Maximized = false;
+GMAT OrbitView.Add = {Chief1, Deputy1, Deputy2, Deputy3, Earth};
+GMAT OrbitView.CoordinateSystem = EarthFixed;
+GMAT OrbitView.DrawObject = [ true true true true true ];
+GMAT OrbitView.DataCollectFrequency = 1;
+GMAT OrbitView.UpdatePlotFrequency = 50;
+GMAT OrbitView.NumPointsToRedraw = 0;
+GMAT OrbitView.ShowPlot = true;
+GMAT OrbitView.MaxPlotPoints = 20000;
+GMAT OrbitView.ShowLabels = true;
+GMAT OrbitView.ViewPointReference = Earth;
+GMAT OrbitView.ViewPointVector = [ 30000 0 0 ];
+GMAT OrbitView.ViewDirection = Earth;
+GMAT OrbitView.ViewScaleFactor = 1;
+GMAT OrbitView.ViewUpCoordinateSystem = EarthFixed;
+GMAT OrbitView.ViewUpAxis = Z;
+GMAT OrbitView.EclipticPlane = Off;
+GMAT OrbitView.XYPlane = On;
+GMAT OrbitView.WireFrame = Off;
+GMAT OrbitView.Axes = On;
+GMAT OrbitView.Grid = Off;
+GMAT OrbitView.SunLine = Off;
+GMAT OrbitView.UseInitialView = On;
+GMAT OrbitView.StarCount = 7000;
+GMAT OrbitView.EnableStars = On;
+GMAT OrbitView.EnableConstellations = On;
+
+Create GroundTrackPlot GroundTrackPlot;
+GMAT GroundTrackPlot.SolverIterations = Current;
+GMAT GroundTrackPlot.UpperLeft = [ 0 0.5663461538461538 ];
+GMAT GroundTrackPlot.Size = [ 0.574398249452954 0.5759615384615384 ];
+GMAT GroundTrackPlot.RelativeZOrder = 88;
+GMAT GroundTrackPlot.Maximized = false;
+GMAT GroundTrackPlot.Add = {Chief1, Deputy1, Deputy2, Deputy3};
+GMAT GroundTrackPlot.DataCollectFrequency = 1;
+GMAT GroundTrackPlot.UpdatePlotFrequency = 50;
+GMAT GroundTrackPlot.NumPointsToRedraw = 0;
+GMAT GroundTrackPlot.ShowPlot = true;
+GMAT GroundTrackPlot.MaxPlotPoints = 20000;
+GMAT GroundTrackPlot.CentralBody = Earth;
+GMAT GroundTrackPlot.TextureMap = 'ModifiedBlueMarble.jpg';
+
+Create ReportFile data_gmat_x_true;
+GMAT data_gmat_x_true.SolverIterations = None;
+GMAT data_gmat_x_true.UpperLeft = [ 0.175054704595186 0.2057692307692308 ];
+GMAT data_gmat_x_true.Size = [ 0.5957330415754923 0.7913461538461538 ];
+GMAT data_gmat_x_true.RelativeZOrder = 62;
+GMAT data_gmat_x_true.Maximized = false;
+GMAT data_gmat_x_true.Filename = '../../data_gmat/data_gmat_x_true.csv';
+GMAT data_gmat_x_true.Precision = 16;
+GMAT data_gmat_x_true.Add = {Chief1.A1ModJulian, Chief1.EarthMJ2000Eq.X, Chief1.EarthMJ2000Eq.Y, Chief1.EarthMJ2000Eq.Z, Deputy1.EarthMJ2000Eq.X, Deputy1.EarthMJ2000Eq.Y, Deputy1.EarthMJ2000Eq.Z, Deputy2.EarthMJ2000Eq.X, Deputy2.EarthMJ2000Eq.Y, Deputy2.EarthMJ2000Eq.Z, Deputy3.EarthMJ2000Eq.X, Deputy3.EarthMJ2000Eq.Y, Deputy3.EarthMJ2000Eq.Z, Chief1.EarthMJ2000Eq.VX, Chief1.EarthMJ2000Eq.VY, Chief1.EarthMJ2000Eq.VZ, Deputy1.EarthMJ2000Eq.VX, Deputy1.EarthMJ2000Eq.VY, Deputy1.EarthMJ2000Eq.VZ, Deputy2.EarthMJ2000Eq.VX, Deputy2.EarthMJ2000Eq.VY, Deputy2.EarthMJ2000Eq.VZ, Deputy3.EarthMJ2000Eq.VX, Deputy3.EarthMJ2000Eq.VY, Deputy3.EarthMJ2000Eq.VZ};
+GMAT data_gmat_x_true.WriteHeaders = true;
+GMAT data_gmat_x_true.LeftJustify = On;
+GMAT data_gmat_x_true.ZeroFill = Off;
+GMAT data_gmat_x_true.FixedWidth = false;
+GMAT data_gmat_x_true.Delimiter = ',';
+GMAT data_gmat_x_true.ColumnWidth = 23;
+GMAT data_gmat_x_true.WriteReport = true;
+
+Create ReportFile data_gmat_STM;
+GMAT data_gmat_STM.SolverIterations = All;
+GMAT data_gmat_STM.UpperLeft = [ 0.0611764705882353 0.1083333333333333 ];
+GMAT data_gmat_STM.Size = [ 0.5994117647058823 0.7989583333333333 ];
+GMAT data_gmat_STM.RelativeZOrder = 71;
+GMAT data_gmat_STM.Maximized = false;
+GMAT data_gmat_STM.Filename = '../../data_gmat/data_gmat_STM.csv';
+GMAT data_gmat_STM.Precision = 16;
+GMAT data_gmat_STM.Add = {Chief1.OrbitSTM, Deputy1.OrbitSTM, Deputy2.OrbitSTM, Deputy3.OrbitSTM};
+GMAT data_gmat_STM.WriteHeaders = true;
+GMAT data_gmat_STM.LeftJustify = On;
+GMAT data_gmat_STM.ZeroFill = Off;
+GMAT data_gmat_STM.FixedWidth = false;
+GMAT data_gmat_STM.Delimiter = ',';
+GMAT data_gmat_STM.ColumnWidth = 23;
+GMAT data_gmat_STM.WriteReport = true;
+
+
+%----------------------------------------
+%---------- Mission Sequence
+%----------------------------------------
+
+BeginMissionSequence;
+Propagate Propagator(Chief1, Deputy1, Deputy2, Deputy3, STM) {Chief1.ElapsedSecs = 21600};
