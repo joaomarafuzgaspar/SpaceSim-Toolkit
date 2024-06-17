@@ -2,7 +2,7 @@ import os
 import numpy as np
 import pandas as pd
 
-from numba import jit  # FIXME: speeding up the code
+# from numba import jit  # FIXME: speeding up the code
 from tqdm import tqdm
 from utils import rmse
 from fcekf import FCEKF
@@ -113,9 +113,12 @@ def run_propagation(args):
     X_true[:, :, 0] = x_initial
     F = np.zeros((24, 24, T + 1))
     F[:, :, 0] = SatelliteDynamics().F_jacobian(x_initial)
+    STM = np.zeros((24, 24, T + 1))
+    STM[:, :, 0] = np.eye(24)
     for i in range(T):
         X_true[:, :, i + 1] = SatelliteDynamics().x_new(dt, X_true[:, :, i])
         F[:, :, i + 1] = SatelliteDynamics().F_jacobian(X_true[:, :, i + 1])
+        STM[:, :, i + 1] = SatelliteDynamics().Phi(dt, X_true[:, :, i]) @ STM[:, :, i]
 
     header = "x_chief,y_chief,z_chief,x_deputy1,y_deputy1,z_deputy1,x_deputy2,y_deputy2,z_deputy2,x_deputy3,y_deputy3,z_deputy3"
     data_x_true = np.column_stack(
@@ -160,6 +163,22 @@ def run_propagation(args):
         }
     )
     df.to_csv("data/data_F.csv", index=False)
+    
+    extracted_data = [
+        extract_and_serialize_submatrices(STM[:, :, t]) for t in range(T + 1)
+    ]
+    columns = ["STM_chief", "STM_deputy1", "STM_deputy2", "STM_deputy3"]
+    matrix_evolution = {col: [] for col in columns}
+    for matrices in extracted_data:
+        for idx, matrix in enumerate(matrices):
+            matrix_evolution[columns[idx]].append(matrix.flatten())
+    df = pd.DataFrame(
+        {
+            col: [" ".join(map(str, row)) for row in matrix_evolution[col]]
+            for col in columns
+        }
+    )
+    df.to_csv("data/data_STM.csv", index=False)
 
 
 def run_simulation(args):

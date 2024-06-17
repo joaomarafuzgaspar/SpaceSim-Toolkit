@@ -199,9 +199,9 @@ class SatelliteDynamics:
                 + dr_ddot_vec_J2_dr_vec
                 + dr_ddot_vec_drag_dr_vec
             )
-            F[
-                i * 6 + 3 : i * 6 + 6, i * 6 + 3 : i * 6 + 6
-            ] = dr_ddot_vec_drag_dr_dot_vec
+            F[i * 6 + 3 : i * 6 + 6, i * 6 + 3 : i * 6 + 6] = (
+                dr_ddot_vec_drag_dr_dot_vec
+            )
 
         return F
 
@@ -224,7 +224,7 @@ class SatelliteDynamics:
 
     def x_new_and_F(self, dt, x_old):
         """
-        Computes the new state vector based on the current state vector and the time step.
+        Computes the new state vector and the Jacobian based on the current state vector and the time step.
 
         Parameters:
         dt (float): Time step.
@@ -232,6 +232,7 @@ class SatelliteDynamics:
 
         Returns:
         x_new (np.array): The new state vector of the satellite (position [km] and velocity [km / s]).
+        F (np.array): The Jacobian of the dynamics w.r.t. the state vector.
         """
         # New state calculation
         k1 = self.f_function(x_old)
@@ -252,3 +253,36 @@ class SatelliteDynamics:
         F = np.eye(len(K1)) + dt / 6 * (dk1_dx + 2 * dk2_dx + 2 * dk3_dx + dk4_dx)
 
         return x_new, F
+
+    def dPhidt(self, x, Phi):
+        """
+        Computes the time derivative of the state transition matrix based on the current state vector and the state transition matrix.
+
+        Parameters:
+        x (np.array): The current state vector of the satellite (position [km] and velocity [km / s]).
+        Phi (np.array): The state transition matrix.
+
+        Returns:
+        dPhi_dt (np.array): The time derivative of the state transition matrix.
+        """
+        return self.F_jacobian(x) @ Phi
+
+    def Phi(self, dt, x_old):
+        """
+        Computes the state transition matrix based on the current state vector and the time step.
+
+        Parameters:
+        dt (float): Time step.
+        x_old (np.array): The current state vector of the satellite (position [km] and velocity [km / s]).
+
+        Returns:
+        Phi (np.array): The state transition matrix.
+        """
+        # State transition matrix calculation
+        K1 = self.dPhidt(x_old, np.eye(len(x_old)))
+        K2 = self.dPhidt(self.x_new(dt / 2, x_old), np.eye(len(x_old)) + dt / 2 * K1)
+        K3 = self.dPhidt(self.x_new(dt / 2, x_old), np.eye(len(x_old)) + dt / 2 * K2)
+        K4 = self.dPhidt(self.x_new(dt, x_old), np.eye(len(x_old)) + dt * K3)
+        Phi = np.eye(len(x_old)) + dt / 6 * (K1 + 2 * K2 + 2 * K3 + K4)
+
+        return Phi
