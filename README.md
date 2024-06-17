@@ -7,7 +7,7 @@
 
 ## 🚀 Index
 - 💡 [Description](#-description)
-- 💿 [Usage](#-usage)
+- 💿 [Installation](#-installation)
 - 📖 [Documentation](#-documentation)
 - 🦆 [Example](#-example)
 - 📞 [Contact](#-contact)
@@ -16,15 +16,27 @@
 ## 💡 Description
 **SpaceSim-Toolkit** is an open-source simulation framework designed for space enthusiasts, researchers, and engineers. It provides tools for simulating spacecraft dynamics, orbital mechanics, and navigation algorithms in various space missions. This code is based on <a href="#ref-1">[1]</a>.
 
-## 💿 Usage
-To use the **SpaceSim-Toolkit**, follow these steps:
+## 💿 Installation
+To setup the virtual environment for **SpaceSim-Toolkit** follow these steps:
 ```bash
-git clone git@github.com:joaomarafuzgaspar/SpaceSim-Toolkit.git
+# Clone the repository
+$ git clone git@github.com:joaomarafuzgaspar/SpaceSim-Toolkit.git
+$ cd SpaceSim-Toolkit
 
-cd SpaceSim-Toolkit
+# Create the virtual environment and activate it
+$ conda env create -f environment.yml
+$ conda activate spacesim-toolkit
 
-python src/main.py
-```
+# Install TudatPy (it'll be useful in the future)
+$ conda install --update-deps -c tudat-team tudatpy
+
+# Install matlab engine for MATLAB release R2022b
+$ python -m pip install matlabengine==9.13.11
+````
+
+> [!IMPORTANT]
+> You need to make sure you have `MATLAB` installed.
+> To know which version of `matlabengine` you need to install, refer to [this link](https://pypi.org/project/matlabengine/).
 
 ## 📖 Documentation
 Alongside `python src/main.py` several command line arguments can be used as follows:
@@ -38,13 +50,13 @@ Alongside `python src/main.py` several command line arguments can be used as fol
 ### Run propagation
 This command propagates the dynamics for the V-R3x mission formation and saves the evolution of the state vectors and Jacobians.
 ```bash
-python src/main.py -f 1 -p
+$ python src/main.py -f 1 -p
 ```
 
 ### Run simulation
 This command runs 10 Monte-Carlo simulations using the `fcekf` algorithm for the V-R3x mission formation, with MATLAB visualization enabled.
 ```bash
-python src/main.py -m -f 1 -a fcekf -M 10
+$ python src/main.py -m -f 1 -a fcekf -M 10
 ```
 
 ### Orbits of the available formations
