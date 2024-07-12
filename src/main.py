@@ -82,7 +82,7 @@ def main():
     if args.matlab == "orbits":
         print("Displaying MATLAB figure with the orbits...")
         run_visualizer(to_display="orbits")
-    elif args.matlab == "all":
+    elif args.matlab == "all_deviations":
         print("Displaying MATLAB figures for all algorithms estimates deviations...")
         run_visualizer(to_display="all_deviations")
     elif args.matlab:

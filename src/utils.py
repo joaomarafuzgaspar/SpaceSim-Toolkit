@@ -9,7 +9,7 @@ def rmse(X_est, X_true):
     )
 
 
-def run_visualizer(to_display):
+def run_visualizer(to_display=None):
     # Start MATLAB engine
     eng = matlab.engine.start_matlab()
 
