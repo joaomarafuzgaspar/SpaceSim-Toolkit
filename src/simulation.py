@@ -7,6 +7,7 @@ from tqdm import tqdm
 from utils import rmse
 from fcekf import FCEKF
 from hcmci import HCMCI
+from wlstsq import WLSTSQ
 from ccekf import EKF, CCEKF
 from scipy.linalg import block_diag
 from dynamics import SatelliteDynamics
@@ -165,7 +166,7 @@ def run_propagation(args):
 def run_simulation(args):
     # Simulation parameters
     dt = 60.0  # Time step [s]
-    T = 395  # Duration [min]
+    T = 3  # Duration [min]
     T_RMSE = 300  # Index from which the RMSE is calculated
     n_simulations = args.monte_carlo_sims  # Number of Monte-Carlo simulations
     L = 1  # Number of consensus iterations
@@ -281,7 +282,66 @@ def run_simulation(args):
     )
 
     # Estimation technique
-    if args.algorithm == "fcekf":
+    if args.algorithm == "wlstsq":
+        fcekf = FCEKF(Q, R)
+        wlstsq = WLSTSQ(Q, R)
+        for i in tqdm(range(n_simulations)):
+            # Observations
+            Y = np.zeros((9, 1, T))
+            for t in range(T):
+                Y[:, :, t] = np.concatenate(
+                    (
+                        fcekf.h_function_chief(X_true[:, :, t]),
+                        fcekf.h_function_deputy(X_true[:, :, t]),
+                    ),
+                    axis=0,
+                ) + np.random.normal(
+                    0, np.sqrt(np.diag(R)).reshape((9, 1)), size=(9, 1)
+                )
+
+            # Initial state vector and state covariance estimate
+            initial_dev = np.concatenate(
+                (
+                    p_pos_initial * np.random.randn(3, 1),
+                    p_vel_initial * np.random.randn(3, 1),
+                    p_pos_initial * np.random.randn(3, 1),
+                    p_vel_initial * np.random.randn(3, 1),
+                    p_pos_initial * np.random.randn(3, 1),
+                    p_vel_initial * np.random.randn(3, 1),
+                    p_pos_initial * np.random.randn(3, 1),
+                    p_vel_initial * np.random.randn(3, 1),
+                )
+            )
+            X_est = wlstsq.apply(dt, x_initial + initial_dev, Y)
+
+            # Compute RMSE
+            rmse_chief_values.append(
+                rmse(X_est[:3, :, T_RMSE:], X_true[:3, :, T_RMSE:])
+            )
+            rmse_deputy1_values.append(
+                rmse(X_est[6:9, :, T_RMSE:], X_true[6:9, :, T_RMSE:])
+            )
+            rmse_deputy2_values.append(
+                rmse(X_est[12:15, :, T_RMSE:], X_true[12:15, :, T_RMSE:])
+            )
+            rmse_deputy3_values.append(
+                rmse(X_est[18:21, :, T_RMSE:], X_true[18:21, :, T_RMSE:])
+            )
+
+            # Compute deviation
+            dev_chief_values.append(
+                np.linalg.norm(X_est[:3, :, :] - X_true[:3, :, :], axis=0)
+            )
+            dev_deputy1_values.append(
+                np.linalg.norm(X_est[6:9, :, :] - X_true[6:9, :, :], axis=0)
+            )
+            dev_deputy2_values.append(
+                np.linalg.norm(X_est[12:15, :, :] - X_true[12:15, :, :], axis=0)
+            )
+            dev_deputy3_values.append(
+                np.linalg.norm(X_est[18:21, :, :] - X_true[18:21, :, :], axis=0)
+            )
+    elif args.algorithm == "fcekf":
         fcekf = FCEKF(Q, R)
         for i in tqdm(range(n_simulations)):
             # Observations
