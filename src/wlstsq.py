@@ -67,81 +67,41 @@ class WLSTSQ:
             ]
         )
 
-    def J_function(self, vars, T):
-        V = vars[: 9 * T].reshape((9, 1, T))
-        W = vars[9 * T :].reshape((24, 1, T - 1))
-
+    def J_function(self, X, dt, T, Y):
+        X = X.reshape((24, 1, T))
         obj_fun = 0
         for t in range(T):
-            obj_fun += np.dot(V[:, :, t].T, np.dot(np.linalg.inv(self.R), V[:, :, t]))
-        for t in range(T - 1):
-            obj_fun += np.dot(W[:, :, t].T, np.dot(np.linalg.inv(self.Q), W[:, :, t]))
-        return obj_fun
-
-    def constraints(self, vars, T, dt, x_initial, Y):
-        V = vars[: 9 * T].reshape((9, 1, T))
-        W = vars[9 * T :].reshape((24, 1, T - 1))
-        X = np.zeros((24, 1, T))
-        X[:, :, 0] = x_initial
-
-        con_eqs = []
-        for t in range(T):
-            con_eqs.append(
-                V[:, :, t]
-                - (
-                    Y[:, :, t]
-                    - np.concatenate(
-                        (
-                            self.h_function_chief(X[:, :, t]),
-                            self.h_function_deputy(X[:, :, t]),
-                        )
-                    )
+            V = Y[:, :, t] - np.concatenate(
+                (
+                    self.h_function_chief(X[:, :, t]),
+                    self.h_function_deputy(X[:, :, t]),
                 )
             )
-            if t != T - 1:
-                con_eqs.append(
-                    W[:, :, t]
-                    - (X[:, :, t + 1] - self.dynamic_model.x_new(dt, X[:, :, t]))
-                )
-                X[:, :, t + 1] = X[:, :, t] + W[:, :, t]
+            obj_fun += np.dot(V.T, np.dot(np.linalg.inv(self.R), V))
+        for t in range(T - 1):
+            W = X[:, :, t + 1] - self.dynamic_model.x_new(dt, X[:, :, t])
+            obj_fun += np.dot(W.T, np.dot(np.linalg.inv(self.Q), W))
+        return obj_fun
 
-        return np.concatenate([eq.flatten() for eq in con_eqs])
-
-    def apply(self, dt, x_initial, Y):
+    def apply(self, dt, x_initial, X_true, Y):
         # Initializations
         T = Y.shape[2]
         X_est = np.zeros((24, 1, T))
-
-        # Initial guess
-        V_initial = np.zeros((9, 1, T))
-        W_initial = np.zeros((24, 1, T - 1))
-        V_initial[:, :, 0] = Y[:, :, 0] - np.concatenate((self.h_function_chief(x_initial), self.h_function_deputy(x_initial)))
-        vars_initial = np.concatenate((V_initial.flatten(), W_initial.flatten()))
+        X_initial = np.zeros((24, 1, T))
+        X_initial[:, :, 0] = x_initial
 
         # Optimization
         solution = minimize(
             fun=self.J_function,
-            x0=vars_initial,
-            args=(T,),
+            x0=X_true.flatten(),
+            args=(dt, T, Y),
             method="SLSQP",
-            constraints=[
-                {
-                    "type": "eq",
-                    "fun": lambda vars: self.constraints(vars, T, dt, x_initial, Y),
-                }
-            ],
             options={"maxiter": 1000, "disp": True},
         )
 
         # Extract the solution
         if solution.success:
-            vars_est = solution.x
-            W_est = vars_est[9 * T :].reshape((24, 1, T - 1))
-
-            # Update X_est based on the optimized V and W
-            X_est[:, :, 0] = x_initial
-            for t in range(T - 1):
-                X_est[:, :, t + 1] = X_est[:, :, t] + W_est[:, :, t]
+            X_est = solution.x.reshape((24, 1, T))
 
             print("Optimization successful")
         else:

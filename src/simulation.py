@@ -166,7 +166,7 @@ def run_propagation(args):
 def run_simulation(args):
     # Simulation parameters
     dt = 60.0  # Time step [s]
-    T = 3  # Duration [min]
+    T = 395  # Duration [min]
     T_RMSE = 300  # Index from which the RMSE is calculated
     n_simulations = args.monte_carlo_sims  # Number of Monte-Carlo simulations
     L = 1  # Number of consensus iterations
@@ -312,7 +312,7 @@ def run_simulation(args):
                     p_vel_initial * np.random.randn(3, 1),
                 )
             )
-            X_est = wlstsq.apply(dt, x_initial + initial_dev, Y)
+            X_est = wlstsq.apply(dt, x_initial + initial_dev, X_true, Y)
 
             # Compute RMSE
             rmse_chief_values.append(
