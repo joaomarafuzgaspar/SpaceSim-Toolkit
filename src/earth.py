@@ -11,7 +11,7 @@ class Earth:
         Initialize Earth parameters.
         """
         self.R = 6378.1363  # Earth's radius [km]
-        self.mu = 3.986004418e5  # Earth's gravitational parameter [km^3 / s^2]
+        self.mu = 3.986004418e5  # Earth's gravitational parameter [km^3 / s^2] | Note: TudatPy uses 398600441500000.0 = 3.986004415e14 [m^3 / s^2]
         self.J_2 = 0.00108262545  # Earth's oblateness term [adimensional]
 
         self.sidereal_day = (

@@ -1,6 +1,178 @@
 import numpy as np
 
 from earth import Earth, AtmosphericModel
+from tudatpy.astro import element_conversion
+
+
+def rotation_matrix_x(alpha):
+    """Returns the 3D rotation matrix around the X-axis for a given angle alpha."""
+    return np.array(
+        [
+            [1, 0, 0],
+            [0, np.cos(alpha), -np.sin(alpha)],
+            [0, np.sin(alpha), np.cos(alpha)],
+        ]
+    )
+
+
+def rotation_matrix_y(beta):
+    """Returns the 3D rotation matrix around the Y-axis for a given angle beta."""
+    return np.array(
+        [[np.cos(beta), 0, np.sin(beta)], [0, 1, 0], [-np.sin(beta), 0, np.cos(beta)]]
+    )
+
+
+def rotation_matrix_z(gamma):
+    """Returns the 3D rotation matrix around the Z-axis for a given angle gamma."""
+    return np.array(
+        [
+            [np.cos(gamma), -np.sin(gamma), 0],
+            [np.sin(gamma), np.cos(gamma), 0],
+            [0, 0, 1],
+        ]
+    )
+
+
+def coe2rv(
+    semi_major_axis,
+    eccentricity,
+    inclination,
+    longitude_of_ascending_node,
+    argument_of_periapsis,
+    true_anomaly,
+):
+    """
+    Converts classical orbital elements to position and velocity vectors.
+
+    Parameters:
+    semi_major_axis (float): Semi-major axis [m].
+    eccentricity (float): Eccentricity.
+    inclination (float): Inclination [rad].
+    longitude_ascending_node (float): Longitude of the ascending node [rad].
+    argument_periapsis (float): Argument of periapsis [rad].
+    true_anomaly (float): True anomaly [rad].
+
+    Returns:
+    np.array: Combined position and velocity vector in the geocentric equatorial frame [km, km/s].
+    """
+    earth = Earth()
+
+    semi_major_axis *= 1e-3  # Convert semi-major axis from m to km
+    r = (
+        semi_major_axis
+        * (1 - eccentricity**2)
+        / (1 + eccentricity * np.cos(true_anomaly))
+    )
+    r_vec_perifocal = np.array([r * np.cos(true_anomaly), r * np.sin(true_anomaly), 0])
+    v_vec_perifocal = np.array(
+        [
+            -np.sqrt(earth.mu / semi_major_axis) * np.sin(true_anomaly),
+            np.sqrt(earth.mu / semi_major_axis) * (eccentricity + np.cos(true_anomaly)),
+            0,
+        ]
+    )
+
+    rotation_matrix_perifocal_to_geocentric_equatorial = (
+        rotation_matrix_z(longitude_of_ascending_node)
+        @ rotation_matrix_x(inclination)
+        @ rotation_matrix_z(argument_of_periapsis)
+    )
+    r_vec_geocentric_equatorial = (
+        rotation_matrix_perifocal_to_geocentric_equatorial @ r_vec_perifocal
+    )
+    v_vec_geocentric_equatorial = (
+        rotation_matrix_perifocal_to_geocentric_equatorial @ v_vec_perifocal
+    )
+
+    rv_geocentric_equatorial_vec = np.concatenate(
+        (r_vec_geocentric_equatorial, v_vec_geocentric_equatorial)
+    )
+
+    if rv_geocentric_equatorial_vec is None:
+        return (
+            element_conversion.keplerian_to_cartesian_elementwise(
+                semi_major_axis=6978e3,
+                eccentricity=2.6e-6,
+                inclination=np.deg2rad(97.79),
+                argument_of_periapsis=np.deg2rad(303.34),
+                longitude_of_ascending_node=np.deg2rad(1.5e-5),
+                true_anomaly=np.deg2rad(157.36),
+                gravitational_parameter=earth.mu * 1e9,
+            )
+            * 1e-3
+        )
+    return rv_geocentric_equatorial_vec
+
+
+def rv2coe(rv_geocentric_equatorial_vec):
+    """
+    Converts position and velocity vectors to classical orbital elements.
+
+    Parameters:
+    rv_geocentric_equatorial_vec (np.array): Combined position and velocity vector in the geocentric equatorial frame [km, km/s].
+
+    Returns:
+    semi_major_axis (float): Semi-major axis [km].
+    eccentricity (float): Eccentricity.
+    inclination (float): Inclination [rad].
+    longitude_of_ascending_node (float): Longitude of the ascending node [rad].
+    argument_periapsis (float): Argument of periapsis [rad].
+    true_anomaly (float): True anomaly [rad].
+    """
+    earth = Earth()
+
+    r_vec = rv_geocentric_equatorial_vec[:3]
+    v_vec = rv_geocentric_equatorial_vec[3:]
+    r = np.linalg.norm(r_vec)
+    v = np.linalg.norm(v_vec)
+
+    semi_major_axis = 1 / (2 / r - v**2 / earth.mu)
+
+    h_vec = np.cross(r_vec, v_vec)
+    e_vec = np.cross(v_vec, h_vec) / earth.mu - r_vec / r
+    eccentricity = np.linalg.norm(e_vec)
+
+    h = np.linalg.norm(h_vec)
+    inclination = np.arccos(h_vec[2] / h)
+
+    e_z_vec = np.array([0, 0, 1])
+    n_vec = np.cross(e_z_vec, h_vec)
+    n = np.linalg.norm(n_vec)
+    longitude_of_ascending_node = np.arccos(n_vec[0] / n)
+    if n_vec[1] < 0:
+        longitude_of_ascending_node = 2 * np.pi - longitude_of_ascending_node
+
+    argument_of_periapsis = np.arccos(np.dot(n_vec, e_vec) / (n * eccentricity))
+    if e_vec[2] < 0:
+        argument_of_periapsis = 2 * np.pi - argument_of_periapsis
+
+    true_anomaly = np.arccos(np.dot(e_vec, r_vec) / (eccentricity * r))
+    v_r = np.dot(v_vec, r_vec) / r
+    if v_r < 0:
+        true_anomaly = 2 * np.pi - true_anomaly
+
+    if (
+        semi_major_axis is None
+        or eccentricity is None
+        or inclination is None
+        or longitude_of_ascending_node is None
+        or argument_of_periapsis is None
+        or true_anomaly is None
+    ):
+        return element_conversion.cartesian_to_keplerian(
+            cartesian_elements=rv_geocentric_equatorial_vec * 1e3,
+            gravitational_parameter=earth.mu * 1e9,
+        )
+    return np.array(
+        [
+            semi_major_axis,
+            eccentricity,
+            inclination,
+            longitude_of_ascending_node,
+            argument_of_periapsis,
+            true_anomaly,
+        ]
+    )
 
 
 class SatelliteDynamics:
@@ -199,9 +371,9 @@ class SatelliteDynamics:
                 + dr_ddot_vec_J2_dr_vec
                 + dr_ddot_vec_drag_dr_vec
             )
-            F[
-                i * 6 + 3 : i * 6 + 6, i * 6 + 3 : i * 6 + 6
-            ] = dr_ddot_vec_drag_dr_dot_vec
+            F[i * 6 + 3 : i * 6 + 6, i * 6 + 3 : i * 6 + 6] = (
+                dr_ddot_vec_drag_dr_dot_vec
+            )
 
         return F
 

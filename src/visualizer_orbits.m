@@ -72,20 +72,29 @@ grid on;
 ax = gca;
 ax.TickLabelInterpreter = "latex";
 ax.FontSize = 14;
-xticklabels(strrep(xticklabels, '-', '$-$'));
-yticklabels(strrep(yticklabels, '-', '$-$'));
-zticklabels(strrep(zticklabels, '-', '$-$'));
 ax.XAxis.Exponent = 6;
 ax.YAxis.Exponent = 6;
 ax.ZAxis.Exponent = 6;
 ax.XAxis.TickLabelsMode = 'auto';
 ax.YAxis.TickLabelsMode = 'auto';
 ax.ZAxis.TickLabelsMode = 'auto';
+xticklabels(strrep(xticklabels, '-', '$-$'));
+yticklabels(strrep(yticklabels, '-', '$-$'));
+zticklabels(strrep(zticklabels, '-', '$-$'));
 ax.XDir = 'reverse';
 ax.YDir = 'reverse';
 
+% Set axis limits
+ax.XLim = [-6.5e6 6.5e6];
+ax.YLim = [-6.5e6 6.5e6];
+ax.ZLim = [-6.5e6 6.5e6];
+
 % Create the annotation for the time display
 time_annotation = annotation('textbox', [0.15, 0.8, 0.1, 0.1], 'String', '', 'FitBoxToText', 'on', 'EdgeColor', 'none', 'FontSize', 14, 'Interpreter', 'latex');
+
+xticklabels(strrep(xticklabels, '-', '$-$'));
+yticklabels(strrep(yticklabels, '-', '$-$'));
+zticklabels(strrep(zticklabels, '-', '$-$'));
 
 % Animation loop
 max_points = 50; % Maximum number of points to display
@@ -107,17 +116,31 @@ for k = 1:T
     set(h_satellite4, 'XData', data.x_deputy3(k), 'YData', data.y_deputy3(k), 'ZData', data.z_deputy3(k));
     
     % Update the time display
-    elapsed_time = t(k) / dt; % Convert time to minutes
-    set(time_annotation, 'String', sprintf('Time: %d min', elapsed_time));
+    elapsed_time_seconds = t(k) / dt * 60; % Convert time to seconds
+    
+    % Create a duration object
+    elapsed_duration = seconds(elapsed_time_seconds);
+    
+    % Extract hours, minutes, and seconds with fractional part
+    total_seconds = seconds(elapsed_duration);
+    hours = floor(total_seconds / 3600);
+    remaining_seconds = total_seconds - hours * 3600;
+    minutes = floor(remaining_seconds / 60);
+    seconds_to_print = remaining_seconds - minutes * 60;
+    
+    % Format the time string with fractional seconds
+    time_string = sprintf('%02d:%02d:%06.3f', hours, minutes, seconds_to_print);
+    
+    set(time_annotation, 'String', sprintf('Epoch: 01 Jan 2000 %s', time_string));
     
     drawnow; % Refresh the plot
-
+    
     % Capture the current frame and write it to the video
     if save_video
         frame = getframe(gcf);
         writeVideo(v, frame);
     end
-
+    
     pause(0.01); % Pause for 0.01 seconds before updating to the next position
 end
 
@@ -130,3 +153,7 @@ end
 
 % Wait for this figure window to close before continuing
 uiwait(gcf);
+
+% To convert the videos to GIF, use the following commands: 
+% ffmpeg -i videos/orbits_form1.mp4 -vf "crop=in_w-200:in_h:100:0,fps=30,scale=960:-1:flags=lanczos,split[s0][s1];[s0]palettegen=max_colors=256:reserve_transparent=true[p];[s1][p]paletteuse=dither=sierra2_4a" gifs/orbits_form1.gif
+% ffmpeg -i videos/orbits_form2.mp4 -vf "crop=in_w-200:in_h:100:0,fps=30,scale=960:-1:flags=lanczos,split[s0][s1];[s0]palettegen=max_colors=256:reserve_transparent=true[p];[s1][p]paletteuse=dither=sierra2_4a" gifs/orbits_form2.gif

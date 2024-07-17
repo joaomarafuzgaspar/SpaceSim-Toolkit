@@ -4,12 +4,12 @@ import pandas as pd
 
 from numba import jit  # FIXME: speeding up the code
 from tqdm import tqdm
-from utils import rmse
 from fcekf import FCEKF
 from hcmci import HCMCI
 from ccekf import EKF, CCEKF
 from scipy.linalg import block_diag
 from dynamics import SatelliteDynamics
+from utils import rmse, get_form_initial_conditions
 
 
 def run_propagation(args):
@@ -17,102 +17,14 @@ def run_propagation(args):
     dt = 60.0  # Time step [s]
     T = 360  # Duration [min]
 
-    # Initial state vector and state covariance
-    if args.formation == 1:
-        # Formation Setup for REx-Lab Mission
-        x_initial = np.array(
-            [
-                6895.6,
-                0,
-                0,
-                0,
-                -0.99164,
-                7.5424,
-                6895.6,
-                3e-05,
-                1e-05,
-                -0.0015,
-                -0.99214,
-                7.5426,
-                6895.6,
-                1e-05,
-                3e-06,
-                0.005,
-                -0.98964,
-                7.5422,
-                6895.6,
-                -2e-05,
-                4e-06,
-                0.00545,
-                -0.99594,
-                7.5423,
-            ]
-        ).reshape(24, 1)
-    elif args.formation == 2:
-        # Formation Setup for Higher-Orbit Difference
-        # x_initial = np.array(
-        #     [
-        #         -1295.9,
-        #         -929.67,
-        #         6793.4,
-        #         -7.4264,
-        #         0.1903,
-        #         -1.3906,
-        #         171.77,
-        #         6857.3,
-        #         -1281.5,
-        #         1.0068,
-        #         -1.3998,
-        #         -7.3585,
-        #         -4300.5,
-        #         1654.8,
-        #         -5241,
-        #         -4.6264,
-        #         3.4437,
-        #         4.8838,
-        #         -2197.8,
-        #         -3973.4,
-        #         -5298.7,
-        #         1.377,
-        #         5.6601,
-        #         -4.8155,
-        #     ]
-        # ).reshape(24, 1)
-
-        x_initial = np.array(
-            [
-                -1295.584507660883,
-                -929.374090790716,
-                6793.411681382508,
-                -7.426511598857044,
-                0.1901977700449196,
-                -1.390296386102339,
-                -171.9053207863305,
-                6857.222886707187,
-                -1281.649066658106,
-                1.00700996311517,
-                -1.399928822038102,
-                -7.358476293144188,
-                -4251.965594108594,
-                1619.96360478974,
-                -5291.008175332099,
-                -4.678160885930184,
-                3.46354521932496,
-                4.820200886960163,
-                -2214.904606485801,
-                -3967.018695794123,
-                -5296.066519714539,
-                1.361455163361585,
-                5.66586154474086,
-                -4.813337608337905,
-            ]
-        ).reshape(24, 1)
+    # Initial state vector
+    X_initial = get_form_initial_conditions(args.formation)
 
     # Get the true state vectors and Jacobians
     X_true = np.zeros((24, 1, T + 1))
-    X_true[:, :, 0] = x_initial
+    X_true[:, :, 0] = X_initial
     F = np.zeros((24, 24, T + 1))
-    F[:, :, 0] = SatelliteDynamics().F_jacobian(x_initial)
+    F[:, :, 0] = SatelliteDynamics().F_jacobian(X_initial)
     for i in range(T):
         X_true[:, :, i + 1] = SatelliteDynamics().x_new(dt, X_true[:, :, i])
         F[:, :, i + 1] = SatelliteDynamics().F_jacobian(X_true[:, :, i + 1])
@@ -145,6 +57,7 @@ def run_propagation(args):
             submatrix = F[i : i + 6, i : i + 6]
             submatrices.append(submatrix)
         return submatrices
+
     extracted_data = [
         extract_and_serialize_submatrices(F[:, :, t]) for t in range(T + 1)
     ]
@@ -174,66 +87,7 @@ def run_simulation(args):
     pi = 1 / N  # Consensus gain 2
 
     # Initial state vector and state covariance
-    if args.formation == 1:
-        # Formation Setup for REx-Lab Mission
-        x_initial = np.array(
-            [
-                6895.6,
-                0,
-                0,
-                0,
-                -0.99164,
-                7.5424,
-                6895.6,
-                3e-05,
-                1e-05,
-                -0.0015,
-                -0.99214,
-                7.5426,
-                6895.6,
-                1e-05,
-                3e-06,
-                0.005,
-                -0.98964,
-                7.5422,
-                6895.6,
-                -2e-05,
-                4e-06,
-                0.00545,
-                -0.99594,
-                7.5423,
-            ]
-        ).reshape(24, 1)
-    elif args.formation == 2:
-        # Formation Setup for Higher-Orbit Difference
-        x_initial = np.array(
-            [
-                -1295.9,
-                -929.67,
-                6793.4,
-                -7.4264,
-                0.1903,
-                -1.3906,
-                171.77,
-                6857.3,
-                -1281.5,
-                1.0068,
-                -1.3998,
-                -7.3585,
-                -4300.5,
-                1654.8,
-                -5241,
-                -4.6264,
-                3.4437,
-                4.8838,
-                -2197.8,
-                -3973.4,
-                -5298.7,
-                1.377,
-                5.6601,
-                -4.8155,
-            ]
-        ).reshape(24, 1)
+    X_initial = get_form_initial_conditions(args.formation)
     p_pos_initial = 1e-1  # [km]
     p_vel_initial = 1e-5  # [km / s]
 
@@ -262,7 +116,7 @@ def run_simulation(args):
 
     # Get the true state vectors
     X_true = np.zeros((24, 1, T))
-    X_true[:, :, 0] = x_initial
+    X_true[:, :, 0] = X_initial
     for i in range(T - 1):
         X_true[:, :, i + 1] = SatelliteDynamics().x_new(dt, X_true[:, :, i])
 
@@ -311,7 +165,7 @@ def run_simulation(args):
                     p_vel_initial * np.random.randn(3, 1),
                 )
             )
-            X_est[:, :, 0] = x_initial + initial_dev
+            X_est[:, :, 0] = X_initial + initial_dev
             P = np.diag(initial_dev.reshape(-1) ** 2)
 
             for t in range(1, T):
@@ -382,11 +236,11 @@ def run_simulation(args):
                     p_vel_initial * np.random.randn(3, 1),
                 )
             )
-            X_est[:, :, 0] = x_initial + initial_dev
-            X_est_chief[:, :, 0] = x_initial + initial_dev
-            X_est_deputy1[:, :, 0] = x_initial + initial_dev
-            X_est_deputy2[:, :, 0] = x_initial + initial_dev
-            X_est_deputy3[:, :, 0] = x_initial + initial_dev
+            X_est[:, :, 0] = X_initial + initial_dev
+            X_est_chief[:, :, 0] = X_initial + initial_dev
+            X_est_deputy1[:, :, 0] = X_initial + initial_dev
+            X_est_deputy2[:, :, 0] = X_initial + initial_dev
+            X_est_deputy3[:, :, 0] = X_initial + initial_dev
             Omega_chief = np.linalg.inv(np.diag(initial_dev.reshape(-1) ** 2))
             Omega_deputy1 = np.linalg.inv(np.diag(initial_dev.reshape(-1) ** 2))
             Omega_deputy2 = np.linalg.inv(np.diag(initial_dev.reshape(-1) ** 2))
@@ -664,11 +518,11 @@ def run_simulation(args):
                     p_vel_initial * np.random.randn(3, 1),
                 )
             )
-            X_est[:, :, 0] = x_initial + initial_dev
-            X_est_chief[:, :, 0] = x_initial[:6] + initial_dev[:6]
-            X_est_deputy1[:, :, 0] = x_initial[6:] + initial_dev[6:]
-            X_est_deputy2[:, :, 0] = x_initial[6:] + initial_dev[6:]
-            X_est_deputy3[:, :, 0] = x_initial[6:] + initial_dev[6:]
+            X_est[:, :, 0] = X_initial + initial_dev
+            X_est_chief[:, :, 0] = X_initial[:6] + initial_dev[:6]
+            X_est_deputy1[:, :, 0] = X_initial[6:] + initial_dev[6:]
+            X_est_deputy2[:, :, 0] = X_initial[6:] + initial_dev[6:]
+            X_est_deputy3[:, :, 0] = X_initial[6:] + initial_dev[6:]
             P_chief = np.diag(initial_dev[:6].reshape(-1) ** 2)
             P_deputy1 = np.diag(initial_dev[6:].reshape(-1) ** 2)
             P_deputy2 = np.diag(initial_dev[6:].reshape(-1) ** 2)
