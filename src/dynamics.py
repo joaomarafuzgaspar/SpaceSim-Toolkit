@@ -278,11 +278,15 @@ class SatelliteDynamics:
         Returns:
         Phi (np.array): The state transition matrix.
         """
+        k1 = self.f_function(x_old)
+        k2 = self.f_function(x_old + dt / 2 * k1)
+        k3 = self.f_function(x_old + dt / 2 * k2)
+        
         # State transition matrix calculation
         K1 = self.dPhidt(x_old, np.eye(len(x_old)))
-        K2 = self.dPhidt(self.x_new(dt / 2, x_old), np.eye(len(x_old)) + dt / 2 * K1)
-        K3 = self.dPhidt(self.x_new(dt / 2, x_old), np.eye(len(x_old)) + dt / 2 * K2)
-        K4 = self.dPhidt(self.x_new(dt, x_old), np.eye(len(x_old)) + dt * K3)
+        K2 = self.dPhidt(x_old + dt / 2 * k1, np.eye(len(x_old)) + dt / 2 * K1)
+        K3 = self.dPhidt(x_old + dt / 2 * k2, np.eye(len(x_old)) + dt / 2 * K2)
+        K4 = self.dPhidt(x_old + dt * k3, np.eye(len(x_old)) + dt * K3)
         Phi = np.eye(len(x_old)) + dt / 6 * (K1 + 2 * K2 + 2 * K3 + K4)
 
         return Phi
