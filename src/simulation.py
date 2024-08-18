@@ -7,6 +7,7 @@ from tqdm import tqdm
 from fcekf import FCEKF
 from hcmci import HCMCI
 from ccekf import EKF, CCEKF
+from datetime import datetime
 from scipy.linalg import block_diag
 from dynamics import SatelliteDynamics
 from utils import rmse, get_form_initial_conditions
@@ -638,5 +639,7 @@ def run_simulation(args):
         )
     )
     header = "dev_chief,dev_deputy1,dev_deputy2,dev_deputy3"
-    os.makedirs(os.path.dirname("data/data.csv"), exist_ok=True)
-    np.savetxt("data/data.csv", data, delimiter=",", header=header, comments="")
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    file_path = f"data/devs_{args.algorithm}_form{args.formation}_{timestamp}.csv"
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+    np.savetxt(file_path, data, delimiter=",", header=header, comments="")
