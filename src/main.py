@@ -1,6 +1,6 @@
 import argparse
 
-from utils import run_visualizer
+from visualizer import run_visualizer
 from simulation import run_simulation, run_propagation
 
 
@@ -65,10 +65,12 @@ def main():
 
     # Parse arguments
     args = parser.parse_args()
-    
+
     # Run propagation
     if args.propagate and args.formation:
-        print(f"Propagating spacecraft dynamics for Formation {'I' if args.formation == 1 else 'II' if args.formation == 2 else 'Unknown'}...")
+        print(
+            f"Propagating spacecraft dynamics for Formation {'I' if args.formation == 1 else 'II' if args.formation == 2 else 'Unknown'}..."
+        )
         run_propagation(args)
 
     # Run simulation
@@ -79,15 +81,8 @@ def main():
         run_simulation(args)
 
     # Check if the MATLAB flag is set
-    if args.matlab == "orbits":
-        print("Displaying MATLAB figure with the orbits...")
-        run_visualizer(to_display="orbits")
-    elif args.matlab == "all_deviations":
-        print("Displaying MATLAB figures for all algorithms estimates deviations...")
-        run_visualizer(to_display="all_deviations")
-    elif args.matlab:
-        print("Displaying MATLAB figure with algorithm estimate deviation...")
-        run_visualizer()
+    if args.matlab:
+        run_visualizer(args)
 
 
 if __name__ == "__main__":
