@@ -39,7 +39,7 @@ def visualizer_devs():
     devs_filepath = get_latest_file("devs_")
     algorithm = re.search(r"devs_(.*?)_", devs_filepath).group(1).upper()
     formation = re.search(r"form(\d+)", devs_filepath).group(1)
-    devs = pd.read_csv(get_latest_file("devs_"))
+    devs = pd.read_csv(devs_filepath)
 
     # Simulation parameters
     dt = 60.0  # Time step [s]
