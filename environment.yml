@@ -1,11 +1,15 @@
 name: spacesim-toolkit
 channels:
-  - defaults
+  - conda-forge
+  - tudat-team
 dependencies:
-  - python=3.10.14
-  - numpy=1.26.4
-  - pandas=2.2.2
-  - numba=0.59.1
-  - tqdm=4.66.4
-  - ipykernel=6.29.4
-  - pip=24.0
+  - tudatpy
+  - matplotlib
+  - scipy
+  - pandas
+  - astropy
+  - numpy<2.0.0
+  - tqdm
+  - pip
+  - pip:
+    - astroquery>=0.4.8.dev9306

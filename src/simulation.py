@@ -2,7 +2,7 @@ import os
 import numpy as np
 import pandas as pd
 
-from numba import jit  # FIXME: speeding up the code
+# from numba import jit  # FIXME: speeding up the code
 from tqdm import tqdm
 from fcekf import FCEKF
 from hcmci import HCMCI
@@ -20,6 +20,37 @@ def run_propagation(args):
 
     # Initial state vector
     X_initial = get_form_initial_conditions(args.formation)
+    X_initial = (
+        np.array(
+            [
+                6895.6,
+                0,
+                0,
+                0,
+                -0.99164,
+                7.5424,
+                6895.6,
+                3e-05,
+                1e-05,
+                -0.0015,
+                -0.99214,
+                7.5426,
+                6895.6,
+                1e-05,
+                3e-06,
+                0.005,
+                -0.98964,
+                7.5422,
+                6895.6,
+                -2e-05,
+                4e-06,
+                0.00545,
+                -0.99594,
+                7.5423,
+            ]
+        ).reshape(24, 1)
+        * 1e3
+    )
 
     # Get the true state vectors and Jacobians
     X_true = np.zeros((24, 1, T + 1))
@@ -31,21 +62,24 @@ def run_propagation(args):
         F[:, :, i + 1] = SatelliteDynamics().F_jacobian(X_true[:, :, i + 1])
 
     header = "x_chief,y_chief,z_chief,x_deputy1,y_deputy1,z_deputy1,x_deputy2,y_deputy2,z_deputy2,x_deputy3,y_deputy3,z_deputy3"
-    data_x_true = np.column_stack(
-        (
-            X_true[0, :, :].reshape(-1, 1),
-            X_true[1, :, :].reshape(-1, 1),
-            X_true[2, :, :].reshape(-1, 1),
-            X_true[6, :, :].reshape(-1, 1),
-            X_true[7, :, :].reshape(-1, 1),
-            X_true[8, :, :].reshape(-1, 1),
-            X_true[12, :, :].reshape(-1, 1),
-            X_true[13, :, :].reshape(-1, 1),
-            X_true[14, :, :].reshape(-1, 1),
-            X_true[18, :, :].reshape(-1, 1),
-            X_true[19, :, :].reshape(-1, 1),
-            X_true[20, :, :].reshape(-1, 1),
+    data_x_true = (
+        np.column_stack(
+            (
+                X_true[0, :, :].reshape(-1, 1),
+                X_true[1, :, :].reshape(-1, 1),
+                X_true[2, :, :].reshape(-1, 1),
+                X_true[6, :, :].reshape(-1, 1),
+                X_true[7, :, :].reshape(-1, 1),
+                X_true[8, :, :].reshape(-1, 1),
+                X_true[12, :, :].reshape(-1, 1),
+                X_true[13, :, :].reshape(-1, 1),
+                X_true[14, :, :].reshape(-1, 1),
+                X_true[18, :, :].reshape(-1, 1),
+                X_true[19, :, :].reshape(-1, 1),
+                X_true[20, :, :].reshape(-1, 1),
+            )
         )
+        * 1e-3
     )
     os.makedirs("data", exist_ok=True)
     np.savetxt(
@@ -89,18 +123,18 @@ def run_simulation(args):
 
     # Initial state vector and state covariance
     X_initial = get_form_initial_conditions(args.formation)
-    p_pos_initial = 1e-1  # [km]
-    p_vel_initial = 1e-5  # [km / s]
+    p_pos_initial = 1e2  # [m]
+    p_vel_initial = 1e-2  # [m / s]
 
     # Process noise
-    q_chief_pos = 1e-4  # [km]
-    q_chief_vel = 1e-5  # [km / s]
+    q_chief_pos = 1e-1  # [m]
+    q_chief_vel = 1e-2  # [m / s]
     Q_chief = (
         np.diag(np.concatenate([q_chief_pos * np.ones(3), q_chief_vel * np.ones(3)]))
         ** 2
     )
-    q_deputy_pos = 1e-3  # [km]
-    q_deputy_vel = 1e-5  # [km / s]
+    q_deputy_pos = 1e0  # [m]
+    q_deputy_vel = 1e-2  # [m / s]
     Q_deputy = (
         np.diag(np.concatenate([q_deputy_pos * np.ones(3), q_deputy_vel * np.ones(3)]))
         ** 2
@@ -109,9 +143,9 @@ def run_simulation(args):
     Q = block_diag(Q_chief, Q_deputies)
 
     # Observation noise
-    r_chief_pos = 1e-4  # [km]
+    r_chief_pos = 1e-1  # [m]
     R_chief = np.diag(np.concatenate([r_chief_pos * np.ones(3)])) ** 2
-    r_deputy_pos = 1e-3  # [km]
+    r_deputy_pos = 1e0  # [m]
     R_deputies = np.diag(np.concatenate([r_deputy_pos * np.ones(6)])) ** 2
     R = block_diag(R_chief, R_deputies)
 
@@ -619,10 +653,10 @@ def run_simulation(args):
     rmse_deputy2_average = np.mean(rmse_deputy2_values)
     rmse_deputy3_average = np.mean(rmse_deputy3_values)
 
-    print(f"Average RMSE for chief: {rmse_chief_average * 1e3} m")
-    print(f"Average RMSE for deputy 1: {rmse_deputy1_average * 1e3} m")
-    print(f"Average RMSE for deputy 2: {rmse_deputy2_average * 1e3} m")
-    print(f"Average RMSE for deputy 3: {rmse_deputy3_average * 1e3} m")
+    print(f"Average RMSE for chief: {rmse_chief_average} m")
+    print(f"Average RMSE for deputy 1: {rmse_deputy1_average} m")
+    print(f"Average RMSE for deputy 2: {rmse_deputy2_average} m")
+    print(f"Average RMSE for deputy 3: {rmse_deputy3_average} m")
 
     # Calculate the average deviation
     dev_chief_average = np.mean(dev_chief_values, axis=0)
@@ -630,13 +664,16 @@ def run_simulation(args):
     dev_deputy2_average = np.mean(dev_deputy2_values, axis=0)
     dev_deputy3_values = np.mean(dev_deputy3_values, axis=0)
 
-    data = np.column_stack(
-        (
-            dev_chief_average.reshape(-1, 1),
-            dev_deputy1_average.reshape(-1, 1),
-            dev_deputy2_average.reshape(-1, 1),
-            dev_deputy3_values.reshape(-1, 1),
+    data = (
+        np.column_stack(
+            (
+                dev_chief_average.reshape(-1, 1),
+                dev_deputy1_average.reshape(-1, 1),
+                dev_deputy2_average.reshape(-1, 1),
+                dev_deputy3_values.reshape(-1, 1),
+            )
         )
+        * 1e-3
     )
     header = "dev_chief,dev_deputy1,dev_deputy2,dev_deputy3"
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")

@@ -53,21 +53,22 @@ def coe2rv(
     true_anomaly (float): True anomaly [rad].
 
     Returns:
-    np.array: Combined position and velocity vector in the geocentric equatorial frame [km, km/s].
+    np.array: Combined position and velocity vector in the geocentric equatorial frame [m, m / s].
     """
     earth = Earth()
 
-    semi_major_axis *= 1e-3  # Convert semi-major axis from m to km
     r = (
         semi_major_axis
         * (1 - eccentricity**2)
         / (1 + eccentricity * np.cos(true_anomaly))
     )
-    r_vec_perifocal = np.array([r * np.cos(true_anomaly), r * np.sin(true_anomaly), 0])
-    v_vec_perifocal = np.array(
+    r_vec_perifocal = r * np.array([np.cos(true_anomaly), np.sin(true_anomaly), 0])
+    v_vec_perifocal = np.sqrt(
+        earth.mu / (semi_major_axis * (1 - eccentricity**2))
+    ) * np.array(
         [
-            -np.sqrt(earth.mu / semi_major_axis) * np.sin(true_anomaly),
-            np.sqrt(earth.mu / semi_major_axis) * (eccentricity + np.cos(true_anomaly)),
+            -np.sin(true_anomaly),
+            eccentricity + np.cos(true_anomaly),
             0,
         ]
     )
@@ -89,17 +90,14 @@ def coe2rv(
     )
 
     if rv_geocentric_equatorial_vec is None:
-        return (
-            element_conversion.keplerian_to_cartesian_elementwise(
-                semi_major_axis=6978e3,
-                eccentricity=2.6e-6,
-                inclination=np.deg2rad(97.79),
-                argument_of_periapsis=np.deg2rad(303.34),
-                longitude_of_ascending_node=np.deg2rad(1.5e-5),
-                true_anomaly=np.deg2rad(157.36),
-                gravitational_parameter=earth.mu * 1e9,
-            )
-            * 1e-3
+        return element_conversion.keplerian_to_cartesian_elementwise(
+            semi_major_axis=semi_major_axis,
+            eccentricity=eccentricity,
+            inclination=inclination,
+            argument_of_periapsis=argument_of_periapsis,
+            longitude_of_ascending_node=longitude_of_ascending_node,
+            true_anomaly=true_anomaly,
+            gravitational_parameter=earth.mu,
         )
     return rv_geocentric_equatorial_vec
 
@@ -109,10 +107,10 @@ def rv2coe(rv_geocentric_equatorial_vec):
     Converts position and velocity vectors to classical orbital elements.
 
     Parameters:
-    rv_geocentric_equatorial_vec (np.array): Combined position and velocity vector in the geocentric equatorial frame [km, km/s].
+    rv_geocentric_equatorial_vec (np.array): Combined position and velocity vector in the geocentric equatorial frame [m, m / s].
 
     Returns:
-    semi_major_axis (float): Semi-major axis [km].
+    semi_major_axis (float): Semi-major axis [m].
     eccentricity (float): Eccentricity.
     inclination (float): Inclination [rad].
     longitude_of_ascending_node (float): Longitude of the ascending node [rad].
@@ -121,8 +119,8 @@ def rv2coe(rv_geocentric_equatorial_vec):
     """
     earth = Earth()
 
-    r_vec = rv_geocentric_equatorial_vec[:3]
-    v_vec = rv_geocentric_equatorial_vec[3:]
+    r_vec = rv_geocentric_equatorial_vec[:3].flatten()
+    v_vec = rv_geocentric_equatorial_vec[3:].flatten()
     r = np.linalg.norm(r_vec)
     v = np.linalg.norm(v_vec)
 
@@ -160,8 +158,8 @@ def rv2coe(rv_geocentric_equatorial_vec):
         or true_anomaly is None
     ):
         return element_conversion.cartesian_to_keplerian(
-            cartesian_elements=rv_geocentric_equatorial_vec * 1e3,
-            gravitational_parameter=earth.mu * 1e9,
+            cartesian_elements=rv_geocentric_equatorial_vec,
+            gravitational_parameter=earth.mu,
         )
     return np.array(
         [
@@ -186,7 +184,7 @@ class SatelliteDynamics:
         Initialize satellite parameters.
         """
         self.C_drag = 2.22  # Drag coefficient
-        self.A_drag = 0.01 * 1e-6  # Drag area [m^2] -> [km^2]
+        self.A_drag = 0.01  # Drag area [m^2]
         self.m = 1.0  # Mass [kg]
 
         self.earth = Earth()  # Earth model
@@ -199,24 +197,24 @@ class SatelliteDynamics:
 
         Parameters:
         t (float): Time.
-        x_vec (np.array): The current state vector of the satellite (position [km] and velocity [km / s]).
+        x_vec (np.array): The current state vector of the satellite (position [m] and velocity [m / s]).
 
         Returns:
         x_dot_vec (np.array): The derivative of the state vector.
         """
         x_dot_vec = np.zeros_like(x_vec)
         for i in range(int(x_vec.shape[0] / 6)):
-            r_vec = x_vec[i * 6 : i * 6 + 3]  # Satellite position vector [km]
-            x, y, z = r_vec  # Satellite position components [km]
-            r = np.linalg.norm(r_vec)  # Satellite position magnitude [km]
+            r_vec = x_vec[i * 6 : i * 6 + 3]  # Satellite position vector [m]
+            x, y, z = r_vec  # Satellite position components [m]
+            r = np.linalg.norm(r_vec)  # Satellite position magnitude [m]
             r_dot_vec = x_vec[
                 i * 6 + 3 : i * 6 + 6
-            ]  # Satellite velocity vector [km / s]
+            ]  # Satellite velocity vector [m / s]
 
             # Compute contributions from Earth's gravitational force
             r_ddot_vec_grav = (
                 -self.earth.mu * r_vec / r**3
-            )  # Acceleration due to gravity [km / s^2]
+            )  # Acceleration due to gravity [m / s^2]
 
             # Compute contributions from Earth's oblateness (J2 effect)
             r_ddot_vec_J2 = (
@@ -229,23 +227,20 @@ class SatelliteDynamics:
                         (3 - 5 * z**2 / r**2) * z,
                     ]
                 )
-            )  # Acceleration due to J2 effect [km / s^2]
+            )  # Acceleration due to J2 effect [m / s^2]
 
             # Compute contributions from atmospheric drag
-            h = r - self.earth.R  # Altitude [km]
-            rho_atm = self.atm.get_rho(h)  # Atmospheric density [kg / km^3]
+            h = r - self.earth.R  # Altitude [m]
+            rho_atm = self.atm.get_rho(h)  # Atmospheric density [kg / m^3]
 
-            # print(self.earth.omega_vec.shape)
-            # print(r_vec.shape)
-            # exit()
             r_dot_vec_rel = r_dot_vec - np.cross(
                 self.earth.omega_vec, r_vec.reshape(-1)
             ).reshape(
                 (3, 1)
-            )  # Relative velocity vector [km / s]
+            )  # Relative velocity vector [m / s]
             r_dot_rel = np.linalg.norm(
                 r_dot_vec_rel
-            )  # Relative velocity magnitude [km / s]
+            )  # Relative velocity magnitude [m / s]
 
             r_ddot_vec_drag = (
                 -0.5
@@ -255,7 +250,7 @@ class SatelliteDynamics:
                 * rho_atm
                 * r_dot_rel
                 * r_dot_vec_rel
-            )  # Acceleration due to atmospheric drag [km / s^2]
+            )  # Acceleration due to atmospheric drag [m / s^2]
 
             # Superposition of all contributions
             x_dot_vec[i * 6 : i * 6 + 6] = np.concatenate(
@@ -267,12 +262,12 @@ class SatelliteDynamics:
     def F_jacobian(self, x_vec):
         F = np.zeros((x_vec.shape[0], x_vec.shape[0]))
         for i in range(int(x_vec.shape[0] / 6)):
-            r_vec = x_vec[i * 6 : i * 6 + 3]  # Satellite position vector [km]
-            x, y, z = r_vec  # Satellite position components [km]
-            r = np.linalg.norm(r_vec)  # Satellite position magnitude [km]
+            r_vec = x_vec[i * 6 : i * 6 + 3]  # Satellite position vector [m]
+            x, y, z = r_vec  # Satellite position components [m]
+            r = np.linalg.norm(r_vec)  # Satellite position magnitude [m]
             r_dot_vec = x_vec[
                 i * 6 + 3 : i * 6 + 6
-            ]  # Satellite velocity vector [km / s]
+            ]  # Satellite velocity vector [m / s]
 
             # Compute contributions from Earth's gravitational force
             dr_ddot_vec_grav_dr_vec = -self.earth.mu * (
@@ -322,20 +317,20 @@ class SatelliteDynamics:
             )  # Jacobian of acceleration due to J2 effect w.r.t. position [s^{-2}]
 
             # Compute contributions from atmospheric drag
-            h = r - self.earth.R  # Altitude [km]
-            rho_atm = self.atm.get_rho(h)  # Atmospheric density [kg / km^3]
+            h = r - self.earth.R  # Altitude [m]
+            rho_atm = self.atm.get_rho(h)  # Atmospheric density [kg / m^3]
             drho_atm_dr_vec = (
                 -rho_atm / self.atm.get_H(h) * r_vec.T / r
-            )  # Jacobian of atmospheric density w.r.t. position [kg / km^4]
+            )  # Jacobian of atmospheric density w.r.t. position [kg / m^4]
 
             r_dot_vec_rel = r_dot_vec - np.cross(
                 self.earth.omega_vec, r_vec.reshape(-1)
             ).reshape(
                 (3, 1)
-            )  # Relative velocity vector [km / s]
+            )  # Relative velocity vector [m / s]
             r_dot_rel = np.linalg.norm(
                 r_dot_vec_rel
-            )  # Relative velocity magnitude [km / s]
+            )  # Relative velocity magnitude [m / s]
             dr_dot_vec_rel_dr_vec = np.array(
                 [[0, self.earth.omega, 0], [-self.earth.omega, 0, 0], [0, 0, 0]]
             )  # Jacobian of relative velocity w.r.t. position [s^{-1}]
@@ -383,10 +378,10 @@ class SatelliteDynamics:
 
         Parameters:
         dt (float): Time step.
-        x_old (np.array): The current state vector of the satellite (position [km] and velocity [km / s]).
+        x_old (np.array): The current state vector of the satellite (position [m] and velocity [m / s]).
 
         Returns:
-        x_new (np.array): The new state vector of the satellite (position [km] and velocity [km / s]).
+        x_new (np.array): The new state vector of the satellite (position [m] and velocity [m / s]).
         """
         k1 = self.f_function(x_old)
         k2 = self.f_function(x_old + dt / 2 * k1)
@@ -400,10 +395,10 @@ class SatelliteDynamics:
 
         Parameters:
         dt (float): Time step.
-        x_old (np.array): The current state vector of the satellite (position [km] and velocity [km / s]).
+        x_old (np.array): The current state vector of the satellite (position [m] and velocity [m / s]).
 
         Returns:
-        x_new (np.array): The new state vector of the satellite (position [km] and velocity [km / s]).
+        x_new (np.array): The new state vector of the satellite (position [m] and velocity [m / s]).
         """
         # New state calculation
         k1 = self.f_function(x_old)

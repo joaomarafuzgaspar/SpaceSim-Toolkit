@@ -27,9 +27,6 @@ $ cd SpaceSim-Toolkit
 $ conda env create -f environment.yml
 $ conda activate spacesim-toolkit
 
-# Install TudatPy (it'll be useful in the future)
-$ conda install --update-deps -c tudat-team tudatpy
-
 # Install matlab engine for MATLAB release R2022b
 $ python -m pip install matlabengine==9.13.11
 ````
