@@ -113,7 +113,7 @@ def metrics(args, M, T_RMSE, data):
 
 
 def visualizer_devs(args):
-    # Load the latest files into DataFrames
+    # Load the latest files
     if args.algorithm and args.formation:
         data_filepath = get_latest_file(
             prefix=f"{args.algorithm}_form{args.formation}_"
@@ -213,109 +213,113 @@ def visualizer_devs(args):
     return
 
 
-def visualizer_all_devs(formation=1):
-    # FIXME
-    # # Load the latest files into DataFrames
-    # fcekf_devs = pd.read_csv(get_latest_file(f"devs_fcekf_form{formation}_"))
-    # hcmci_devs = pd.read_csv(get_latest_file(f"devs_hcmci_form{formation}_"))
-    # ccekf_devs = pd.read_csv(get_latest_file(f"devs_ccekf_form{formation}_"))
+def visualizer_all_devs(args):
+    # Load the latest files
+    data_filepath_fcekf = get_latest_file(prefix=f"fcekf_form{args.formation}_")
+    data_filepath_hcmci = get_latest_file(prefix=f"hcmci_form{args.formation}_")
+    data_filepath_ccekf = get_latest_file(prefix=f"ccekf_form{args.formation}_")
+    with open(data_filepath_fcekf, "rb") as f:
+        data_fcekf = pickle.load(f)
+    with open(data_filepath_hcmci, "rb") as f:
+        data_hcmci = pickle.load(f)
+    with open(data_filepath_ccekf, "rb") as f:
+        data_ccekf = pickle.load(f)
+    print(f'Plotting data from "{data_filepath_fcekf}", "{data_filepath_hcmci}" and "{data_filepath_ccekf}"...')
 
-    # # Simulation parameters
-    # dt = 60.0  # Time step [s]
-    # T = len(fcekf_devs["dev_chief"])  # Duration [min]
-    # t = np.arange(0, dt * (T + 1), dt)  # Time vector [s]
+    # Simulation parameters
+    dt = 60.0  # Time step [s]
+    T = np.shape(data_fcekf["true"])[2]  # Duration [min]
+    T_RMSE = T - 95  # Duration for RMSE calculation [min]
+    time = np.arange(0, T) / dt  # Time vector [h]
+    M = len(data_fcekf) - 1  # Number of Monte Carlo simulations
 
-    # # Plot positions based on screen size
-    # fig_width = 2 * 6.4  # in inches
-    # fig_height = 2 * 4.8  # in inches
+    # Get data to plot
+    dev_chief_fcekf, dev_deputy1_fcekf, dev_deputy2_fcekf, dev_deputy3_fcekf = metrics(args, M, T_RMSE, data_fcekf)
+    dev_chief_hcmci, dev_deputy1_hcmci, dev_deputy2_hcmci, dev_deputy3_hcmci = metrics(args, M, T_RMSE, data_hcmci)
+    dev_chief_ccekf, dev_deputy1_ccekf, dev_deputy2_ccekf, dev_deputy3_ccekf = metrics(args, M, T_RMSE, data_ccekf)
 
-    # # Create a 2 by 2 figure
-    # fig, axs = plt.subplots(2, 2, figsize=(fig_width, fig_height))
+    # Plot positions based on screen size
+    fig_width = 2 * 6.4  # in inches
+    fig_height = 2 * 4.8  # in inches
 
-    # # Plot 1: Chief
-    # axs[0, 0].plot(t[:T] / (dt * dt), fcekf_devs["dev_chief"], ".-", label="FCEKF")
-    # axs[0, 0].plot(t[:T] / (dt * dt), hcmci_devs["dev_chief"], ".-", label="HCMCI")
-    # axs[0, 0].plot(t[:T] / (dt * dt), ccekf_devs["dev_chief"], ".-", label="CCEKF")
-    # axs[0, 0].grid(which="major", color="#DDDDDD", zorder=1)
-    # axs[0, 0].grid(which="minor", color="#DDDDDD", linestyle=(0, (1, 3)), zorder=2)
-    # axs[0, 0].grid(True, which="both")
-    # axs[0, 0].set_yscale("log")
-    # axs[0, 0].set_xlabel("$t$ [h]", fontsize=12)
-    # axs[0, 0].set_ylabel(
-    #     "$\\left\\|\\hat{\\mathbf{r}}_k^{\\mathcal{C}_1} - \\mathbf{r}_k^{\\mathcal{C}_1}\\right\\|_\\mathrm{av}$ [km]",
-    #     fontsize=12,
-    # )
-    # axs[0, 0].set_ylim([1e-5, 1e0])
-    # axs[0, 0].tick_params(axis="both", which="both", direction="in")
-    # axs[0, 0].legend(fontsize=12)
-    # axs[0, 0].set_title("Chief")
+    # Create a 2 by 2 figure
+    fig, axs = plt.subplots(2, 2, figsize=(fig_width, fig_height))
 
-    # # Plot 2: Deputy 1
-    # axs[0, 1].plot(t[:T] / (dt * dt), fcekf_devs["dev_deputy1"], ".-", label="FCEKF")
-    # axs[0, 1].plot(t[:T] / (dt * dt), hcmci_devs["dev_deputy1"], ".-", label="HCMCI")
-    # axs[0, 1].plot(t[:T] / (dt * dt), ccekf_devs["dev_deputy1"], ".-", label="CCEKF")
-    # axs[0, 1].grid(which="major", color="#DDDDDD", zorder=1)
-    # axs[0, 1].grid(which="minor", color="#DDDDDD", linestyle=(0, (1, 3)), zorder=2)
-    # axs[0, 1].grid(True, which="both")
-    # axs[0, 1].set_yscale("log")
-    # axs[0, 1].set_xlabel("$t$ [h]", fontsize=12)
-    # axs[0, 1].set_ylabel(
-    #     "$\\left\\|\\hat{\\mathbf{r}}_k^{\\mathcal{D}_1} - \\mathbf{r}_k^{\\mathcal{D}_1}\\right\\|_\\mathrm{av}$ [km]",
-    #     fontsize=12,
-    # )
-    # axs[0, 1].set_ylim([1e-4, 1e0])
-    # axs[0, 1].legend(fontsize=12)
-    # axs[0, 1].set_title("Deputy 1")
+    # Plot 1: Chief
+    axs[0, 0].plot(time, dev_chief_fcekf, ".-", label="FCEKF")
+    axs[0, 0].plot(time, dev_chief_hcmci, ".-", label="HCMCI")
+    axs[0, 0].plot(time, dev_chief_ccekf, ".-", label="CCEKF")
+    axs[0, 0].grid(which="major", color="#DDDDDD", zorder=1)
+    axs[0, 0].grid(which="minor", color="#DDDDDD", linestyle=(0, (1, 3)), zorder=2)
+    axs[0, 0].grid(True, which="both")
+    axs[0, 0].set_yscale("log")
+    axs[0, 0].set_xlabel("$t$ [h]", fontsize=12)
+    axs[0, 0].set_ylabel(
+        "$\\left\\|\\hat{\\mathbf{r}}_k^{\\mathcal{C}_1} - \\mathbf{r}_k^{\\mathcal{C}_1}\\right\\|_\\mathrm{av}$ [km]",
+        fontsize=12,
+    )
+    axs[0, 0].set_ylim([1e-2, 1e3])
+    axs[0, 0].tick_params(axis="both", which="both", direction="in")
+    axs[0, 0].legend(fontsize=12)
+    axs[0, 0].set_title("Chief")
 
-    # # Plot 3: Deputy 2
-    # axs[1, 0].plot(
-    #     t[:T] / (dt * dt), fcekf_devs["dev_deputy2"], ".-", linewidth=2, label="FCEKF"
-    # )
-    # axs[1, 0].plot(
-    #     t[:T] / (dt * dt), hcmci_devs["dev_deputy2"], ".-", linewidth=2, label="HCMCI"
-    # )
-    # axs[1, 0].plot(
-    #     t[:T] / (dt * dt), ccekf_devs["dev_deputy2"], ".-", linewidth=2, label="CCEKF"
-    # )
-    # axs[1, 0].grid(which="major", color="#DDDDDD", zorder=1)
-    # axs[1, 0].grid(which="minor", color="#DDDDDD", linestyle=(0, (1, 3)), zorder=2)
-    # axs[1, 0].grid(True, which="both")
-    # axs[1, 0].set_yscale("log")
-    # axs[1, 0].set_xlabel("$t$ [h]", fontsize=12)
-    # axs[1, 0].set_ylabel(
-    #     "$\\left\\|\\hat{\\mathbf{r}}_k^{\\mathcal{D}_2} - \\mathbf{r}_k^{\\mathcal{D}_2}\\right\\|_\\mathrm{av}$ [km]",
-    #     fontsize=12,
-    # )
-    # axs[1, 0].set_ylim([1e-4, 1e0])
-    # axs[1, 0].legend(fontsize=12)
-    # axs[1, 0].set_title("Deputy 2")
+    # Plot 2: Deputy 1
+    axs[0, 1].plot(time, dev_deputy1_fcekf, ".-", label="FCEKF")
+    axs[0, 1].plot(time, dev_deputy1_hcmci, ".-", label="HCMCI")
+    axs[0, 1].plot(time, dev_deputy1_ccekf, ".-", label="CCEKF")
+    axs[0, 1].grid(which="major", color="#DDDDDD", zorder=1)
+    axs[0, 1].grid(which="minor", color="#DDDDDD", linestyle=(0, (1, 3)), zorder=2)
+    axs[0, 1].grid(True, which="both")
+    axs[0, 1].set_yscale("log")
+    axs[0, 1].set_xlabel("$t$ [h]", fontsize=12)
+    axs[0, 1].set_ylabel(
+        "$\\left\\|\\hat{\\mathbf{r}}_k^{\\mathcal{D}_1} - \\mathbf{r}_k^{\\mathcal{D}_1}\\right\\|_\\mathrm{av}$ [km]",
+        fontsize=12,
+    )
+    axs[0, 1].set_ylim([1e-1, 1e3])
+    axs[0, 1].tick_params(axis="both", which="both", direction="in")
+    axs[0, 1].legend(fontsize=12)
+    axs[0, 1].set_title("Deputy 1")
 
-    # # Plot 4: Deputy 3
-    # axs[1, 1].plot(
-    #     t[:T] / (dt * dt), fcekf_devs["dev_deputy3"], ".-", linewidth=2, label="FCEKF"
-    # )
-    # axs[1, 1].plot(
-    #     t[:T] / (dt * dt), hcmci_devs["dev_deputy3"], ".-", linewidth=2, label="HCMCI"
-    # )
-    # axs[1, 1].plot(
-    #     t[:T] / (dt * dt), ccekf_devs["dev_deputy3"], ".-", linewidth=2, label="CCEKF"
-    # )
-    # axs[1, 1].grid(which="major", color="#DDDDDD", zorder=1)
-    # axs[1, 1].grid(which="minor", color="#DDDDDD", linestyle=(0, (1, 3)), zorder=2)
-    # axs[1, 1].grid(True, which="both")
-    # axs[1, 1].set_yscale("log")
-    # axs[1, 1].set_xlabel("$t$ [h]", fontsize=12)
-    # axs[1, 1].set_ylabel(
-    #     "$\\left\\|\\hat{\\mathbf{r}}_k^{\\mathcal{D}_3} - \\mathbf{r}_k^{\\mathcal{D}_3}\\right\\|_\\mathrm{av}$ [km]",
-    #     fontsize=12,
-    # )
-    # axs[1, 1].set_ylim([1e-4, 1e0])
-    # axs[1, 1].legend(fontsize=12)
-    # axs[1, 1].set_title("Deputy 3")
+    # Plot 3: Deputy 2
+    axs[1, 0].plot(time, dev_deputy2_fcekf, ".-", label="FCEKF")
+    axs[1, 0].plot(time, dev_deputy2_hcmci, ".-", label="HCMCI")
+    axs[1, 0].plot(time, dev_deputy2_ccekf, ".-", label="CCEKF")
+    axs[1, 0].grid(which="major", color="#DDDDDD", zorder=1)
+    axs[1, 0].grid(which="minor", color="#DDDDDD", linestyle=(0, (1, 3)), zorder=2)
+    axs[1, 0].grid(True, which="both")
+    axs[1, 0].set_yscale("log")
+    axs[1, 0].set_xlabel("$t$ [h]", fontsize=12)
+    axs[1, 0].set_ylabel(
+        "$\\left\\|\\hat{\\mathbf{r}}_k^{\\mathcal{D}_2} - \\mathbf{r}_k^{\\mathcal{D}_2}\\right\\|_\\mathrm{av}$ [km]",
+        fontsize=12,
+    )
+    axs[1, 0].set_ylim([1e-1, 1e3])
+    axs[1, 0].tick_params(axis="both", which="both", direction="in")
+    axs[1, 0].legend(fontsize=12)
+    axs[1, 0].set_title("Deputy 2")
 
-    # fig.suptitle(f"Formation {formation}", fontsize=16)
-    # plt.tight_layout()
-    # plt.show()
+    # Plot 4: Deputy 3
+    axs[1, 1].plot(time, dev_deputy3_fcekf, ".-", label="FCEKF")
+    axs[1, 1].plot(time, dev_deputy3_hcmci, ".-", label="HCMCI")
+    axs[1, 1].plot(time, dev_deputy3_ccekf, ".-", label="CCEKF")
+    axs[1, 1].grid(which="major", color="#DDDDDD", zorder=1)
+    axs[1, 1].grid(which="minor", color="#DDDDDD", linestyle=(0, (1, 3)), zorder=2)
+    axs[1, 1].grid(True, which="both")
+    axs[1, 1].set_yscale("log")
+    axs[1, 1].set_xlabel("$t$ [h]", fontsize=12)
+    axs[1, 1].set_ylabel(
+        "$\\left\\|\\hat{\\mathbf{r}}_k^{\\mathcal{D}_3} - \\mathbf{r}_k^{\\mathcal{D}_3}\\right\\|_\\mathrm{av}$ [km]",
+        fontsize=12,
+    )
+    axs[1, 1].set_ylim([1e-1, 1e3])
+    axs[1, 1].tick_params(axis="both", which="both", direction="in")
+    axs[1, 1].legend(fontsize=12)
+    axs[1, 1].set_title("Deputy 3")
+
+    fig.suptitle(f"Formation {args.formation}", fontsize=16)
+    plt.tight_layout(rect=[0, 0, 1, 1])
+    plt.show()
     return
 
 
@@ -335,7 +339,7 @@ def run_visualizer(args):
         print(
             f"Displaying all algorithms estimates deviations for Formation {'I' if args.formation == 1 else 'II' if args.formation == 2 else 'Unknown'}..."
         )
-        visualizer_all_devs(args.formation)
+        visualizer_all_devs(args)
     else:
         print("Displaying deviation for latest applied algorithm...")
         visualizer_devs(args)
