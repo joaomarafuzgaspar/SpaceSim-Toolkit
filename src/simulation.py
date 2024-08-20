@@ -562,11 +562,12 @@ def run_simulation(args):
         rmse_deputy1 = rmse(X_est_all[m][6:12, :, T_RMSE:], X_true[6:12, :, T_RMSE:])
         rmse_deputy2 = rmse(X_est_all[m][12:18, :, T_RMSE:], X_true[12:18, :, T_RMSE:])
         rmse_deputy3 = rmse(X_est_all[m][18:24, :, T_RMSE:], X_true[18:24, :, T_RMSE:])
+        invalid_rmse = 1e2
         if (
-            rmse_chief < 1e2
-            and rmse_deputy1 < 1e2
-            and rmse_deputy2 < 1e2
-            and rmse_deputy3 < 1e2
+            rmse_chief < invalid_rmse
+            and rmse_deputy1 < invalid_rmse
+            and rmse_deputy2 < invalid_rmse
+            and rmse_deputy3 < invalid_rmse
         ):
             rmse_chief_values.append(rmse_chief)
             rmse_deputy1_values.append(rmse_deputy1)

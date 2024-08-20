@@ -58,10 +58,10 @@ def metrics(args, M, T_RMSE, data):
         X_est = data[m]
 
         # Compute relative deviations
-        dev_chief = np.linalg.norm(X_est[:6, :, :] - X_true[:6, :, :], axis=0)
-        dev_deputy1 = np.linalg.norm(X_est[6:12, :, :] - X_true[6:12, :, :], axis=0)
-        dev_deputy2 = np.linalg.norm(X_est[12:18, :, :] - X_true[12:18, :, :], axis=0)
-        dev_deputy3 = np.linalg.norm(X_est[18:24, :, :] - X_true[18:24, :, :], axis=0)
+        dev_chief = np.linalg.norm(X_est[:3, :, :] - X_true[:3, :, :], axis=0)
+        dev_deputy1 = np.linalg.norm(X_est[6:9, :, :] - X_true[6:9, :, :], axis=0)
+        dev_deputy2 = np.linalg.norm(X_est[12:15, :, :] - X_true[12:15, :, :], axis=0)
+        dev_deputy3 = np.linalg.norm(X_est[18:21, :, :] - X_true[18:21, :, :], axis=0)
 
         # Compute RMSEs
         rmse_chief = rmse(X_est[:6, :, T_RMSE:], X_true[:6, :, T_RMSE:])
@@ -91,14 +91,13 @@ def metrics(args, M, T_RMSE, data):
             # print(f'    - Deputy 2: {rmse_deputy2} m')
             # print(f'    - Deputy 3: {rmse_deputy3} m')
         else:
-            if args.formation is None and args.algorithm is None:
-                print(
-                    f"(!!) For Monte Carlo Run #{m + 1} the algorithm diverged with RMSEs:"
-                )
-                print(f"    - Chief: {rmse_chief} m")
-                print(f"    - Deputy 1: {rmse_deputy1} m")
-                print(f"    - Deputy 2: {rmse_deputy2} m")
-                print(f"    - Deputy 3: {rmse_deputy3} m")
+            print(
+                f"(!!) For Monte Carlo Run #{m + 1} the algorithm diverged with RMSEs:"
+            )
+            print(f"    - Chief: {rmse_chief} m")
+            print(f"    - Deputy 1: {rmse_deputy1} m")
+            print(f"    - Deputy 2: {rmse_deputy2} m")
+            print(f"    - Deputy 3: {rmse_deputy3} m")
 
     # Compute averages
     dev_chief_avg = np.mean(dev_chief_values, axis=0).reshape(-1, 1)
@@ -130,7 +129,7 @@ def visualizer_devs(args):
     # Simulation parameters
     dt = 60.0  # Time step [s]
     T = np.shape(data["true"])[2]  # Duration [min]
-    T_RMSE = T - 35  # Duration for RMSE calculation [min]
+    T_RMSE = T - 95  # Duration for RMSE calculation [min]
     time = np.arange(0, T) / dt  # Time vector [h]
     M = len(data) - 1  # Number of Monte Carlo simulations
 
