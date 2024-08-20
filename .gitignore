@@ -165,5 +165,6 @@ cython_debug/
 #  https://developer.apple.com/library/mac/documentation/FileSystem/Conceptual/FileSystemProgrammingGuide/MacOSXDirectories/MacOSXDirectories.html
 .DS_Store
 
-# Files that start with 'devs' inside the 'data' directory
-data/devs*
+# Pickle or CSV files
+data/*.pkl
+data/*.csv

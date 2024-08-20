@@ -27,14 +27,14 @@ def main():
         description="SpaceSim-Toolkit is an advanced, open-source simulation framework designed for space enthusiasts, researchers, and engineers. This versatile toolkit focuses on providing a robust platform for simulating spacecraft dynamics, orbital mechanics, and navigation algorithms in various space missions and scenarios."
     )
     parser.add_argument(
-        "-m",
-        "--matlab",
+        "-v",
+        "--visualize",
         nargs="?",  # '?' allows the argument to be optional
         default=None,
         const=True,  # If the argument is provided without a value, set it to True
         choices=[None, "all_deviations", "orbits"],
         action=MatlabAction,
-        help="Display MATLAB figure(s); use 'all' to display all algorithms estimates deviations and 'orbits' to display the orbits.",
+        help="Display figure(s); use 'all_deviations' to display all algorithms estimates deviations and 'orbits' to display the orbits.",
     )
     parser.add_argument(
         "-f",
@@ -81,7 +81,7 @@ def main():
         run_simulation(args)
 
     # Check if the MATLAB flag is set
-    if args.matlab:
+    if args.visualize:
         run_visualizer(args)
 
 

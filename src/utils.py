@@ -1,7 +1,8 @@
-import os
+import pickle
 import numpy as np
 
 from dynamics import coe2rv
+from datetime import datetime
 
 
 def get_form_initial_conditions(formation):
@@ -91,3 +92,18 @@ def rmse(X_est, X_true):
     return np.sqrt(
         np.mean(np.linalg.norm(X_est[:3, :, :] - X_true[:3, :, :], axis=0) ** 2)
     )
+
+
+def save_data(args, X_true, X_est_all):
+    # Fill the dictionary
+    data = {}
+    data["true"] = X_true
+    for m in range(args.monte_carlo_sims):
+        data[m] = X_est_all[m]
+
+    # Save to pickle file
+    with open(
+        f'data/{args.algorithm}_form{args.formation}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.pkl',
+        "wb",
+    ) as file:
+        pickle.dump(data, file)

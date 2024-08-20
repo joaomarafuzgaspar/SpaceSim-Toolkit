@@ -37,7 +37,7 @@ $ python -m pip install matlabengine==9.13.11
 
 ## 📖 Documentation
 Alongside `python src/main.py` several command line arguments can be used as follows:
-- `-m` or `--matlab`: To display MATLAB figure(s). If `None` it displays last applied algorithm deviations, `all_deviations` displays all applied algorithms deviations and `orbits` displays last propagated orbits.
+- `-v` or `--visualize`: To display figure(s). If `None` it displays last applied algorithm deviations, `all_deviations` displays all applied algorithms deviations and `orbits` displays last propagated orbits.
 - `-f` or `--formation`: Choose formation type (1 for V-R3x mission, 2 for higher-orbit).
 - `-a` or `--algorithm`: Select navigation algorithm (fcekf, hcmci, or ccekf).
 - `-M` or `--monte-carlo-sims`: Set number of Monte-Carlo simulations to run (integer >= 1).
@@ -51,9 +51,9 @@ $ python src/main.py -f 1 -p
 ```
 
 ### Run simulation
-This command runs 10 Monte-Carlo simulations using the `fcekf` algorithm for the V-R3x mission formation, with MATLAB visualization enabled.
+This command runs 10 Monte-Carlo simulations using the `fcekf` algorithm for the V-R3x mission formation, with visualization enabled.
 ```bash
-$ python src/main.py -m -f 1 -a fcekf -M 10
+$ python src/main.py -v -f 1 -a fcekf -M 10
 ```
 
 ### Orbits of the available formations

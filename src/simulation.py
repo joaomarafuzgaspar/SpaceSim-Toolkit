@@ -7,10 +7,9 @@ from tqdm import tqdm
 from fcekf import FCEKF
 from hcmci import HCMCI
 from ccekf import EKF, CCEKF
-from datetime import datetime
 from scipy.linalg import block_diag
 from dynamics import SatelliteDynamics
-from utils import rmse, get_form_initial_conditions
+from utils import get_form_initial_conditions, rmse, save_data
 
 
 def run_propagation(args):
@@ -57,9 +56,9 @@ def run_propagation(args):
     X_true[:, :, 0] = X_initial
     F = np.zeros((24, 24, T + 1))
     F[:, :, 0] = SatelliteDynamics().F_jacobian(X_initial)
-    for i in range(T):
-        X_true[:, :, i + 1] = SatelliteDynamics().x_new(dt, X_true[:, :, i])
-        F[:, :, i + 1] = SatelliteDynamics().F_jacobian(X_true[:, :, i + 1])
+    for t in range(T):
+        X_true[:, :, t + 1] = SatelliteDynamics().x_new(dt, X_true[:, :, t])
+        F[:, :, t + 1] = SatelliteDynamics().F_jacobian(X_true[:, :, t + 1])
 
     header = "x_chief,y_chief,z_chief,x_deputy1,y_deputy1,z_deputy1,x_deputy2,y_deputy2,z_deputy2,x_deputy3,y_deputy3,z_deputy3"
     data_x_true = (
@@ -115,16 +114,18 @@ def run_simulation(args):
     dt = 60.0  # Time step [s]
     T = 395  # Duration [min]
     T_RMSE = 300  # Index from which the RMSE is calculated
-    n_simulations = args.monte_carlo_sims  # Number of Monte-Carlo simulations
+    M = args.monte_carlo_sims  # Number of Monte-Carlo simulations
     L = 1  # Number of consensus iterations
     N = 4  # Number of satellites
     gamma = N  # Consensus gain 1
     pi = 1 / N  # Consensus gain 2
 
-    # Initial state vector and state covariance
+    # Initial state vector and get the true state vectors (propagation) FIXME: Add run_propagation() here
     X_initial = get_form_initial_conditions(args.formation)
-    p_pos_initial = 1e2  # [m]
-    p_vel_initial = 1e-2  # [m / s]
+    X_true = np.zeros((24, 1, T))
+    X_true[:, :, 0] = X_initial
+    for t in range(T - 1):
+        X_true[:, :, t + 1] = SatelliteDynamics().x_new(dt, X_true[:, :, t])
 
     # Process noise
     q_chief_pos = 1e-1  # [m]
@@ -149,30 +150,15 @@ def run_simulation(args):
     R_deputies = np.diag(np.concatenate([r_deputy_pos * np.ones(6)])) ** 2
     R = block_diag(R_chief, R_deputies)
 
-    # Get the true state vectors
-    X_true = np.zeros((24, 1, T))
-    X_true[:, :, 0] = X_initial
-    for i in range(T - 1):
-        X_true[:, :, i + 1] = SatelliteDynamics().x_new(dt, X_true[:, :, i])
+    # Initial deviation noise
+    p_pos_initial = 1e2  # [m]
+    p_vel_initial = 1e-2  # [m / s]
 
     # Simulation
-    rmse_chief_values, rmse_deputy1_values, rmse_deputy2_values, rmse_deputy3_values = (
-        [],
-        [],
-        [],
-        [],
-    )
-    dev_chief_values, dev_deputy1_values, dev_deputy2_values, dev_deputy3_values = (
-        [],
-        [],
-        [],
-        [],
-    )
-
-    # Estimation technique
+    X_est_all = []
     if args.algorithm == "fcekf":
         fcekf = FCEKF(Q, R)
-        for i in tqdm(range(n_simulations)):
+        for m in tqdm(range(M)):
             # Observations
             Y = np.zeros((9, 1, T))
             for t in range(T):
@@ -205,41 +191,14 @@ def run_simulation(args):
 
             for t in range(1, T):
                 X_est[:, :, t], P = fcekf.apply(dt, X_est[:, :, t - 1], P, Y[:, :, t])
-
-            # Compute RMSE
-            rmse_chief_values.append(
-                rmse(X_est[:3, :, T_RMSE:], X_true[:3, :, T_RMSE:])
-            )
-            rmse_deputy1_values.append(
-                rmse(X_est[6:9, :, T_RMSE:], X_true[6:9, :, T_RMSE:])
-            )
-            rmse_deputy2_values.append(
-                rmse(X_est[12:15, :, T_RMSE:], X_true[12:15, :, T_RMSE:])
-            )
-            rmse_deputy3_values.append(
-                rmse(X_est[18:21, :, T_RMSE:], X_true[18:21, :, T_RMSE:])
-            )
-
-            # Compute deviation
-            dev_chief_values.append(
-                np.linalg.norm(X_est[:3, :, :] - X_true[:3, :, :], axis=0)
-            )
-            dev_deputy1_values.append(
-                np.linalg.norm(X_est[6:9, :, :] - X_true[6:9, :, :], axis=0)
-            )
-            dev_deputy2_values.append(
-                np.linalg.norm(X_est[12:15, :, :] - X_true[12:15, :, :], axis=0)
-            )
-            dev_deputy3_values.append(
-                np.linalg.norm(X_est[18:21, :, :] - X_true[18:21, :, :], axis=0)
-            )
+            X_est_all.append(X_est)
     elif args.algorithm == "hcmci":
         fcekf = FCEKF(Q, R)
         chief_hcmci = HCMCI(np.linalg.inv(Q), np.linalg.inv(R))
         deputy1_hcmci = HCMCI(np.linalg.inv(Q), np.linalg.inv(R))
         deputy2_hcmci = HCMCI(np.linalg.inv(Q), np.linalg.inv(R))
         deputy3_hcmci = HCMCI(np.linalg.inv(Q), np.linalg.inv(R))
-        for i in tqdm(range(n_simulations)):
+        for m in tqdm(range(M)):
             # Observations
             Y = np.zeros((9, 1, T))
             for t in range(T):
@@ -487,41 +446,14 @@ def run_simulation(args):
                     ),
                     axis=0,
                 )
-
-            # Compute RMSE
-            rmse_chief_values.append(
-                rmse(X_est[:3, :, T_RMSE:], X_true[:3, :, T_RMSE:])
-            )
-            rmse_deputy1_values.append(
-                rmse(X_est[6:9, :, T_RMSE:], X_true[6:9, :, T_RMSE:])
-            )
-            rmse_deputy2_values.append(
-                rmse(X_est[12:15, :, T_RMSE:], X_true[12:15, :, T_RMSE:])
-            )
-            rmse_deputy3_values.append(
-                rmse(X_est[18:21, :, T_RMSE:], X_true[18:21, :, T_RMSE:])
-            )
-
-            # Compute deviation
-            dev_chief_values.append(
-                np.linalg.norm(X_est[:3, :, :] - X_true[:3, :, :], axis=0)
-            )
-            dev_deputy1_values.append(
-                np.linalg.norm(X_est[6:9, :, :] - X_true[6:9, :, :], axis=0)
-            )
-            dev_deputy2_values.append(
-                np.linalg.norm(X_est[12:15, :, :] - X_true[12:15, :, :], axis=0)
-            )
-            dev_deputy3_values.append(
-                np.linalg.norm(X_est[18:21, :, :] - X_true[18:21, :, :], axis=0)
-            )
+            X_est_all.append(X_est)
     elif args.algorithm == "ccekf":
         fcekf = FCEKF(Q, R)
         chief_ekf = EKF(Q_chief, R_chief)
         deputy1_ccekf = CCEKF(Q_deputies, R_deputies)
         deputy2_ccekf = CCEKF(Q_deputies, R_deputies)
         deputy3_ccekf = CCEKF(Q_deputies, R_deputies)
-        for i in tqdm(range(n_simulations)):
+        for m in tqdm(range(M)):
             # Observations
             Y = np.zeros((9, 1, T))
             for t in range(T):
@@ -618,65 +550,41 @@ def run_simulation(args):
                     ),
                     axis=0,
                 )
+            X_est_all.append(X_est)
 
-            # Compute RMSE
-            rmse_chief_values.append(
-                rmse(X_est[:3, :, T_RMSE:], X_true[:3, :, T_RMSE:])
+    # Compute average RMSE
+    rmse_chief_values = []
+    rmse_deputy1_values = []
+    rmse_deputy2_values = []
+    rmse_deputy3_values = []
+    for m in range(M):
+        rmse_chief = rmse(X_est_all[m][:6, :, T_RMSE:], X_true[:6, :, T_RMSE:])
+        rmse_deputy1 = rmse(X_est_all[m][6:12, :, T_RMSE:], X_true[6:12, :, T_RMSE:])
+        rmse_deputy2 = rmse(X_est_all[m][12:18, :, T_RMSE:], X_true[12:18, :, T_RMSE:])
+        rmse_deputy3 = rmse(X_est_all[m][18:24, :, T_RMSE:], X_true[18:24, :, T_RMSE:])
+        if (
+            rmse_chief < 1e2
+            and rmse_deputy1 < 1e2
+            and rmse_deputy2 < 1e2
+            and rmse_deputy3 < 1e2
+        ):
+            rmse_chief_values.append(rmse_chief)
+            rmse_deputy1_values.append(rmse_deputy1)
+            rmse_deputy2_values.append(rmse_deputy2)
+            rmse_deputy3_values.append(rmse_deputy3)
+        else:
+            print(
+                f"(!!) For Monte Carlo Run #{m + 1} the algorithm diverged with RMSEs:"
             )
-            rmse_deputy1_values.append(
-                rmse(X_est[6:9, :, T_RMSE:], X_true[6:9, :, T_RMSE:])
-            )
-            rmse_deputy2_values.append(
-                rmse(X_est[12:15, :, T_RMSE:], X_true[12:15, :, T_RMSE:])
-            )
-            rmse_deputy3_values.append(
-                rmse(X_est[18:21, :, T_RMSE:], X_true[18:21, :, T_RMSE:])
-            )
+            print(f"    - Chief: {rmse_chief} m")
+            print(f"    - Deputy 1: {rmse_deputy1} m")
+            print(f"    - Deputy 2: {rmse_deputy2} m")
+            print(f"    - Deputy 3: {rmse_deputy3} m")
+    print(f"Average RMSEs:")
+    print(f"    - Chief: {np.mean(rmse_chief_values)} m")
+    print(f"    - Deputy 1: {np.mean(rmse_deputy1_values)} m")
+    print(f"    - Deputy 2: {np.mean(rmse_deputy2_values)} m")
+    print(f"    - Deputy 3: {np.mean(rmse_deputy3_values)} m")
 
-            # Compute deviation
-            dev_chief_values.append(
-                np.linalg.norm(X_est[:3, :, :] - X_true[:3, :, :], axis=0)
-            )
-            dev_deputy1_values.append(
-                np.linalg.norm(X_est[6:9, :, :] - X_true[6:9, :, :], axis=0)
-            )
-            dev_deputy2_values.append(
-                np.linalg.norm(X_est[12:15, :, :] - X_true[12:15, :, :], axis=0)
-            )
-            dev_deputy3_values.append(
-                np.linalg.norm(X_est[18:21, :, :] - X_true[18:21, :, :], axis=0)
-            )
-
-    # Calculate average RMSE
-    rmse_chief_average = np.mean(rmse_chief_values)
-    rmse_deputy1_average = np.mean(rmse_deputy1_values)
-    rmse_deputy2_average = np.mean(rmse_deputy2_values)
-    rmse_deputy3_average = np.mean(rmse_deputy3_values)
-
-    print(f"Average RMSE for chief: {rmse_chief_average} m")
-    print(f"Average RMSE for deputy 1: {rmse_deputy1_average} m")
-    print(f"Average RMSE for deputy 2: {rmse_deputy2_average} m")
-    print(f"Average RMSE for deputy 3: {rmse_deputy3_average} m")
-
-    # Calculate the average deviation
-    dev_chief_average = np.mean(dev_chief_values, axis=0)
-    dev_deputy1_average = np.mean(dev_deputy1_values, axis=0)
-    dev_deputy2_average = np.mean(dev_deputy2_values, axis=0)
-    dev_deputy3_values = np.mean(dev_deputy3_values, axis=0)
-
-    data = (
-        np.column_stack(
-            (
-                dev_chief_average.reshape(-1, 1),
-                dev_deputy1_average.reshape(-1, 1),
-                dev_deputy2_average.reshape(-1, 1),
-                dev_deputy3_values.reshape(-1, 1),
-            )
-        )
-        * 1e-3
-    )
-    header = "dev_chief,dev_deputy1,dev_deputy2,dev_deputy3"
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    file_path = f"data/devs_{args.algorithm}_form{args.formation}_{timestamp}.csv"
-    os.makedirs(os.path.dirname(file_path), exist_ok=True)
-    np.savetxt(file_path, data, delimiter=",", header=header, comments="")
+    # Save data to pickle file
+    save_data(args, X_true, X_est_all)
