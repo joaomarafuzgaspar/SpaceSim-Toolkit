@@ -224,7 +224,9 @@ def visualizer_all_devs(args):
         data_hcmci = pickle.load(f)
     with open(data_filepath_ccekf, "rb") as f:
         data_ccekf = pickle.load(f)
-    print(f'Plotting data from "{data_filepath_fcekf}", "{data_filepath_hcmci}" and "{data_filepath_ccekf}"...')
+    print(
+        f'Plotting data from "{data_filepath_fcekf}", "{data_filepath_hcmci}" and "{data_filepath_ccekf}"...'
+    )
 
     # Simulation parameters
     dt = 60.0  # Time step [s]
@@ -234,9 +236,15 @@ def visualizer_all_devs(args):
     M = len(data_fcekf) - 1  # Number of Monte Carlo simulations
 
     # Get data to plot
-    dev_chief_fcekf, dev_deputy1_fcekf, dev_deputy2_fcekf, dev_deputy3_fcekf = metrics(args, M, T_RMSE, data_fcekf)
-    dev_chief_hcmci, dev_deputy1_hcmci, dev_deputy2_hcmci, dev_deputy3_hcmci = metrics(args, M, T_RMSE, data_hcmci)
-    dev_chief_ccekf, dev_deputy1_ccekf, dev_deputy2_ccekf, dev_deputy3_ccekf = metrics(args, M, T_RMSE, data_ccekf)
+    dev_chief_fcekf, dev_deputy1_fcekf, dev_deputy2_fcekf, dev_deputy3_fcekf = metrics(
+        args, M, T_RMSE, data_fcekf
+    )
+    dev_chief_hcmci, dev_deputy1_hcmci, dev_deputy2_hcmci, dev_deputy3_hcmci = metrics(
+        args, M, T_RMSE, data_hcmci
+    )
+    dev_chief_ccekf, dev_deputy1_ccekf, dev_deputy2_ccekf, dev_deputy3_ccekf = metrics(
+        args, M, T_RMSE, data_ccekf
+    )
 
     # Plot positions based on screen size
     fig_width = 2 * 6.4  # in inches
@@ -331,10 +339,19 @@ def run_visualizer(args):
         eng.addpath(matlab_functions_path, nargout=0)
         print("Displaying MATLAB figure with the orbits...")
         try:
-            eng.visualizer_orbits(nargout=0)
+            if args.formation:
+                data_filepath = get_latest_file(
+                    prefix=f"prop_form{args.formation}", suffix=".mat"
+                )
+                formation = args.formation
+            else:
+                data_filepath = get_latest_file(prefix="prop", suffix=".mat")
+                formation = re.search(r"form(\d+)", data_filepath).group(1)
+            eng.visualizer_orbits(data_filepath, formation, nargout=0)
         except engine.MatlabExecutionError as e:
             print(f"An error occurred: {e}")
-        eng.quit()
+        finally:
+            eng.quit()
     elif args.visualize == "all_deviations":
         print(
             f"Displaying all algorithms estimates deviations for Formation {'I' if args.formation == 1 else 'II' if args.formation == 2 else 'Unknown'}..."

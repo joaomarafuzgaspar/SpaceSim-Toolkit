@@ -9,7 +9,12 @@ from hcmci import HCMCI
 from ccekf import EKF, CCEKF
 from scipy.linalg import block_diag
 from dynamics import SatelliteDynamics
-from utils import get_form_initial_conditions, rmse, save_data
+from utils import (
+    rmse,
+    save_simulation_data,
+    save_propagation_data,
+    get_form_initial_conditions,
+)
 
 
 def run_propagation(args):
@@ -19,94 +24,15 @@ def run_propagation(args):
 
     # Initial state vector
     X_initial = get_form_initial_conditions(args.formation)
-    X_initial = (
-        np.array(
-            [
-                6895.6,
-                0,
-                0,
-                0,
-                -0.99164,
-                7.5424,
-                6895.6,
-                3e-05,
-                1e-05,
-                -0.0015,
-                -0.99214,
-                7.5426,
-                6895.6,
-                1e-05,
-                3e-06,
-                0.005,
-                -0.98964,
-                7.5422,
-                6895.6,
-                -2e-05,
-                4e-06,
-                0.00545,
-                -0.99594,
-                7.5423,
-            ]
-        ).reshape(24, 1)
-        * 1e3
-    )
 
     # Get the true state vectors and Jacobians
-    X_true = np.zeros((24, 1, T + 1))
-    X_true[:, :, 0] = X_initial
-    F = np.zeros((24, 24, T + 1))
-    F[:, :, 0] = SatelliteDynamics().F_jacobian(X_initial)
-    for t in range(T):
-        X_true[:, :, t + 1] = SatelliteDynamics().x_new(dt, X_true[:, :, t])
-        F[:, :, t + 1] = SatelliteDynamics().F_jacobian(X_true[:, :, t + 1])
+    X = np.zeros((24, 1, T))
+    X[:, :, 0] = X_initial
+    for t in range(T - 1):
+        X[:, :, t + 1] = SatelliteDynamics().x_new(dt, X[:, :, t])
 
-    header = "x_chief,y_chief,z_chief,x_deputy1,y_deputy1,z_deputy1,x_deputy2,y_deputy2,z_deputy2,x_deputy3,y_deputy3,z_deputy3"
-    data_x_true = (
-        np.column_stack(
-            (
-                X_true[0, :, :].reshape(-1, 1),
-                X_true[1, :, :].reshape(-1, 1),
-                X_true[2, :, :].reshape(-1, 1),
-                X_true[6, :, :].reshape(-1, 1),
-                X_true[7, :, :].reshape(-1, 1),
-                X_true[8, :, :].reshape(-1, 1),
-                X_true[12, :, :].reshape(-1, 1),
-                X_true[13, :, :].reshape(-1, 1),
-                X_true[14, :, :].reshape(-1, 1),
-                X_true[18, :, :].reshape(-1, 1),
-                X_true[19, :, :].reshape(-1, 1),
-                X_true[20, :, :].reshape(-1, 1),
-            )
-        )
-        * 1e-3
-    )
-    os.makedirs("data", exist_ok=True)
-    np.savetxt(
-        "data/data_x_true.csv", data_x_true, delimiter=",", header=header, comments=""
-    )
-
-    def extract_and_serialize_submatrices(F):
-        submatrices = []
-        for i in range(0, 24, 6):
-            submatrix = F[i : i + 6, i : i + 6]
-            submatrices.append(submatrix)
-        return submatrices
-
-    extracted_data = [
-        extract_and_serialize_submatrices(F[:, :, t]) for t in range(T + 1)
-    ]
-    columns = ["F_chief", "F_deputy1", "F_deputy2", "F_deputy3"]
-    matrix_evolution = {col: [] for col in columns}
-    for matrices in extracted_data:
-        for idx, matrix in enumerate(matrices):
-            matrix_evolution[columns[idx]].append(matrix.flatten())
-    df = pd.DataFrame(
-        {
-            col: [" ".join(map(str, row)) for row in matrix_evolution[col]]
-            for col in columns
-        }
-    )
-    df.to_csv("data/data_F.csv", index=False)
+    # Save data to pickle file
+    save_propagation_data(args, dt, T, X)
 
 
 def run_simulation(args):
@@ -588,4 +514,4 @@ def run_simulation(args):
     print(f"    - Deputy 3: {np.mean(rmse_deputy3_values)} m")
 
     # Save data to pickle file
-    save_data(args, X_true, X_est_all)
+    save_simulation_data(args, X_true, X_est_all)

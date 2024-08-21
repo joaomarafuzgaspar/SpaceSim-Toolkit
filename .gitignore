@@ -168,3 +168,6 @@ cython_debug/
 # Pickle or CSV files
 data/*.pkl
 data/*.csv
+
+# Videos
+videos/

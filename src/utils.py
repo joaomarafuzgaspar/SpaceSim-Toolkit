@@ -2,6 +2,7 @@ import pickle
 import numpy as np
 
 from dynamics import coe2rv
+from scipy.io import savemat
 from datetime import datetime
 
 
@@ -94,7 +95,27 @@ def rmse(X_est, X_true):
     )
 
 
-def save_data(args, X_true, X_est_all):
+def save_propagation_data(args, dt, T, X):
+    # Fill the dictionary
+    data = {}
+    for t, time in enumerate(np.arange(0, T * dt, dt)):
+        data[float(time)] = X[:, :, t]
+
+    # Save to pickle file
+    with open(
+        f'data/prop_form{args.formation}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.pkl',
+        "wb",
+    ) as file:
+        pickle.dump(data, file)
+
+    # Save to .mat file
+    savemat(
+        f'data/prop_form{args.formation}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.mat',
+        {"X": X.reshape(24, -1)},
+    )
+
+
+def save_simulation_data(args, X_true, X_est_all):
     # Fill the dictionary
     data = {}
     data["true"] = X_true
