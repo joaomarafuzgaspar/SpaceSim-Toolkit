@@ -165,9 +165,10 @@ cython_debug/
 #  https://developer.apple.com/library/mac/documentation/FileSystem/Conceptual/FileSystemProgrammingGuide/MacOSXDirectories/MacOSXDirectories.html
 .DS_Store
 
-# Pickle or CSV files
+# Pickle, CSV or MATfiles
 data/*.pkl
 data/*.csv
+data/*.mat
 
 # Videos
 videos/

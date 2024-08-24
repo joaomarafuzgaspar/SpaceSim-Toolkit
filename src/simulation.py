@@ -17,6 +17,10 @@ from utils import (
 )
 
 
+def run_tudat_propagation(args):
+    return print("Tudat propagation is not implemented yet.")
+
+
 def run_propagation(args):
     # Simulation parameters
     dt = 60.0  # Time step [s]
