@@ -9,7 +9,7 @@
 - 💡 [Description](#-description)
 - 💿 [Installation](#-installation)
 - 📖 [Documentation](#-documentation)
-- 🦆 [Example](#-example)
+- 🦆 [Examples](#-examples)
 - 📞 [Contact](#-contact)
 - 💥 [References](#-references)
 
