@@ -37,8 +37,8 @@ def coe2rv(
     semi_major_axis,
     eccentricity,
     inclination,
-    longitude_of_ascending_node,
     argument_of_periapsis,
+    longitude_of_ascending_node,
     true_anomaly,
 ):
     """
@@ -48,8 +48,8 @@ def coe2rv(
     semi_major_axis (float): Semi-major axis [m].
     eccentricity (float): Eccentricity.
     inclination (float): Inclination [rad].
+    argument_of_periapsis (float): Argument of periapsis [rad].
     longitude_ascending_node (float): Longitude of the ascending node [rad].
-    argument_periapsis (float): Argument of periapsis [rad].
     true_anomaly (float): True anomaly [rad].
 
     Returns:
@@ -113,8 +113,8 @@ def rv2coe(rv_geocentric_equatorial_vec):
     semi_major_axis (float): Semi-major axis [m].
     eccentricity (float): Eccentricity.
     inclination (float): Inclination [rad].
+    argument_of_periapsis (float): Argument of periapsis [rad].
     longitude_of_ascending_node (float): Longitude of the ascending node [rad].
-    argument_periapsis (float): Argument of periapsis [rad].
     true_anomaly (float): True anomaly [rad].
     """
     earth = Earth()
@@ -153,8 +153,8 @@ def rv2coe(rv_geocentric_equatorial_vec):
         semi_major_axis is None
         or eccentricity is None
         or inclination is None
-        or longitude_of_ascending_node is None
         or argument_of_periapsis is None
+        or longitude_of_ascending_node is None
         or true_anomaly is None
     ):
         return element_conversion.cartesian_to_keplerian(
@@ -166,8 +166,8 @@ def rv2coe(rv_geocentric_equatorial_vec):
             semi_major_axis,
             eccentricity,
             inclination,
-            longitude_of_ascending_node,
             argument_of_periapsis,
+            longitude_of_ascending_node,
             true_anomaly,
         ]
     )

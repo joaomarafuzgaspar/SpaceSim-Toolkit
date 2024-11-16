@@ -56,8 +56,8 @@ def get_form_initial_conditions(formation):
             semi_major_axis=6978e3,
             eccentricity=2.6e-6,
             inclination=np.deg2rad(97.79),
-            longitude_of_ascending_node=np.deg2rad(1.5e-5),
             argument_of_periapsis=np.deg2rad(303.34),
+            longitude_of_ascending_node=np.deg2rad(1.5e-5),
             true_anomaly=np.deg2rad(157.36),
         )
         x_initial_deputy1 = coe2rv(
