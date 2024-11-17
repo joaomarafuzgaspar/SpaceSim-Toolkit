@@ -151,7 +151,7 @@ def visualizer_devs(args):
     axs[0, 0].set_yscale("log")
     axs[0, 0].set_xlabel("$t$ [h]", fontsize=12)
     axs[0, 0].set_ylabel(
-        "$\\left\\|\\hat{\\mathbf{r}}_k^{\\mathcal{C}_1} - \\mathbf{r}_k^{\\mathcal{C}_1}\\right\\|_\\mathrm{av}$ [km]",
+        "$\\left\\|\\hat{\\mathbf{r}}_k^{\\mathcal{C}_1} - \\mathbf{r}_k^{\\mathcal{C}_1}\\right\\|_\\mathrm{av}$ [m]",
         fontsize=12,
     )
     axs[0, 0].set_ylim([1e-2, 1e3])
@@ -167,7 +167,7 @@ def visualizer_devs(args):
     axs[0, 1].set_yscale("log")
     axs[0, 1].set_xlabel("$t$ [h]", fontsize=12)
     axs[0, 1].set_ylabel(
-        "$\\left\\|\\hat{\\mathbf{r}}_k^{\\mathcal{D}_1} - \\mathbf{r}_k^{\\mathcal{D}_1}\\right\\|_\\mathrm{av}$ [km]",
+        "$\\left\\|\\hat{\\mathbf{r}}_k^{\\mathcal{D}_1} - \\mathbf{r}_k^{\\mathcal{D}_1}\\right\\|_\\mathrm{av}$ [m]",
         fontsize=12,
     )
     axs[0, 1].set_ylim([1e-1, 1e3])
@@ -183,7 +183,7 @@ def visualizer_devs(args):
     axs[1, 0].set_yscale("log")
     axs[1, 0].set_xlabel("$t$ [h]", fontsize=12)
     axs[1, 0].set_ylabel(
-        "$\\left\\|\\hat{\\mathbf{r}}_k^{\\mathcal{D}_2} - \\mathbf{r}_k^{\\mathcal{D}_2}\\right\\|_\\mathrm{av}$ [km]",
+        "$\\left\\|\\hat{\\mathbf{r}}_k^{\\mathcal{D}_2} - \\mathbf{r}_k^{\\mathcal{D}_2}\\right\\|_\\mathrm{av}$ [m]",
         fontsize=12,
     )
     axs[1, 0].set_ylim([1e-1, 1e3])
@@ -199,7 +199,7 @@ def visualizer_devs(args):
     axs[1, 1].set_yscale("log")
     axs[1, 1].set_xlabel("$t$ [h]", fontsize=12)
     axs[1, 1].set_ylabel(
-        "$\\left\\|\\hat{\\mathbf{r}}_k^{\\mathcal{D}_3} - \\mathbf{r}_k^{\\mathcal{D}_3}\\right\\|_\\mathrm{av}$ [km]",
+        "$\\left\\|\\hat{\\mathbf{r}}_k^{\\mathcal{D}_3} - \\mathbf{r}_k^{\\mathcal{D}_3}\\right\\|_\\mathrm{av}$ [m]",
         fontsize=12,
     )
     axs[1, 1].set_ylim([1e-1, 1e3])
@@ -263,7 +263,7 @@ def visualizer_all_devs(args):
     axs[0, 0].set_yscale("log")
     axs[0, 0].set_xlabel("$t$ [h]", fontsize=12)
     axs[0, 0].set_ylabel(
-        "$\\left\\|\\hat{\\mathbf{r}}_k^{\\mathcal{C}_1} - \\mathbf{r}_k^{\\mathcal{C}_1}\\right\\|_\\mathrm{av}$ [km]",
+        "$\\left\\|\\hat{\\mathbf{r}}_k^{\\mathcal{C}_1} - \\mathbf{r}_k^{\\mathcal{C}_1}\\right\\|_\\mathrm{av}$ [m]",
         fontsize=12,
     )
     axs[0, 0].set_ylim([1e-2, 1e3])
@@ -281,7 +281,7 @@ def visualizer_all_devs(args):
     axs[0, 1].set_yscale("log")
     axs[0, 1].set_xlabel("$t$ [h]", fontsize=12)
     axs[0, 1].set_ylabel(
-        "$\\left\\|\\hat{\\mathbf{r}}_k^{\\mathcal{D}_1} - \\mathbf{r}_k^{\\mathcal{D}_1}\\right\\|_\\mathrm{av}$ [km]",
+        "$\\left\\|\\hat{\\mathbf{r}}_k^{\\mathcal{D}_1} - \\mathbf{r}_k^{\\mathcal{D}_1}\\right\\|_\\mathrm{av}$ [m]",
         fontsize=12,
     )
     axs[0, 1].set_ylim([1e-1, 1e3])
@@ -299,7 +299,7 @@ def visualizer_all_devs(args):
     axs[1, 0].set_yscale("log")
     axs[1, 0].set_xlabel("$t$ [h]", fontsize=12)
     axs[1, 0].set_ylabel(
-        "$\\left\\|\\hat{\\mathbf{r}}_k^{\\mathcal{D}_2} - \\mathbf{r}_k^{\\mathcal{D}_2}\\right\\|_\\mathrm{av}$ [km]",
+        "$\\left\\|\\hat{\\mathbf{r}}_k^{\\mathcal{D}_2} - \\mathbf{r}_k^{\\mathcal{D}_2}\\right\\|_\\mathrm{av}$ [m]",
         fontsize=12,
     )
     axs[1, 0].set_ylim([1e-1, 1e3])
@@ -317,7 +317,7 @@ def visualizer_all_devs(args):
     axs[1, 1].set_yscale("log")
     axs[1, 1].set_xlabel("$t$ [h]", fontsize=12)
     axs[1, 1].set_ylabel(
-        "$\\left\\|\\hat{\\mathbf{r}}_k^{\\mathcal{D}_3} - \\mathbf{r}_k^{\\mathcal{D}_3}\\right\\|_\\mathrm{av}$ [km]",
+        "$\\left\\|\\hat{\\mathbf{r}}_k^{\\mathcal{D}_3} - \\mathbf{r}_k^{\\mathcal{D}_3}\\right\\|_\\mathrm{av}$ [m]",
         fontsize=12,
     )
     axs[1, 1].set_ylim([1e-1, 1e3])
