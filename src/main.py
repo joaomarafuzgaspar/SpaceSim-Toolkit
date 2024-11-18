@@ -47,8 +47,8 @@ def main():
         "-a",
         "--algorithm",
         type=str,
-        choices=["fcekf", "hcmci", "ccekf"],
-        help="Navigation algorithm to simulate (fcekf for FCEKF, hcmci for HCMCI, or ccekf for CCEKF)",
+        choices=["wlstsq-lm", "fcekf", "hcmci", "ccekf"],
+        help="Navigation algorithm to simulate (wlstsq-lm for WLSTSQ-LM, fcekf for FCEKF, hcmci for HCMCI, or ccekf for CCEKF)",
     )
     parser.add_argument(
         "-M",

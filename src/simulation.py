@@ -7,6 +7,7 @@ from tqdm import tqdm
 from fcekf import FCEKF
 from hcmci import HCMCI
 from ccekf import EKF, CCEKF
+from wlstsq_lm import WLSTSQ_LM
 from scipy.linalg import block_diag
 from dynamics import SatelliteDynamics
 from utils import (
@@ -42,7 +43,7 @@ def run_propagation(args):
 def run_simulation(args):
     # Simulation parameters
     dt = 60.0  # Time step [s]
-    T = 395  # Duration [min]
+    T = 20  # Duration [min]
     T_RMSE = 300  # Index from which the RMSE is calculated
     M = args.monte_carlo_sims  # Number of Monte-Carlo simulations
     L = 1  # Number of consensus iterations
@@ -86,6 +87,42 @@ def run_simulation(args):
 
     # Simulation
     X_est_all = []
+    if args.algorithm == "wlstsq-lm":
+        fcekf = FCEKF(Q, R)
+        wlstsq_lm = WLSTSQ_LM(Q, R)
+        for m in tqdm(range(M)):
+            # Observations
+            Y = np.zeros((9, 1, T))
+            for t in range(T):
+                Y[:, :, t] = np.concatenate(
+                    (
+                        fcekf.h_function_chief(X_true[:, :, t]),
+                        fcekf.h_function_deputy(X_true[:, :, t]),
+                    ),
+                    axis=0,
+                ) + np.random.normal(
+                    0, np.sqrt(np.diag(R)).reshape((9, 1)), size=(9, 1)
+                )
+
+            # Initial state vector and state covariance estimate
+            X_est = np.zeros_like(X_true)
+            initial_dev = np.concatenate(
+                (
+                    p_pos_initial * np.random.randn(3, 1),
+                    p_vel_initial * np.random.randn(3, 1),
+                    p_pos_initial * np.random.randn(3, 1),
+                    p_vel_initial * np.random.randn(3, 1),
+                    p_pos_initial * np.random.randn(3, 1),
+                    p_vel_initial * np.random.randn(3, 1),
+                    p_pos_initial * np.random.randn(3, 1),
+                    p_vel_initial * np.random.randn(3, 1),
+                )
+            )
+            X_est[:, :, 0] = X_initial + initial_dev
+            for t in range(1, T):
+                X_est[:, :, t] = SatelliteDynamics().x_new(dt, X_est[:, :, t - 1])
+            X_est = wlstsq_lm.apply(dt, X_est, Y)
+            X_est_all.append(X_est)
     if args.algorithm == "fcekf":
         fcekf = FCEKF(Q, R)
         for m in tqdm(range(M)):
