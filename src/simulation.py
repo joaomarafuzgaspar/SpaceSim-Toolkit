@@ -43,7 +43,7 @@ def run_propagation(args):
 def run_simulation(args):
     # Simulation parameters
     dt = 60.0  # Time step [s]
-    T = 20  # Duration [min]
+    T = 395  # Duration [min]
     T_RMSE = 300  # Index from which the RMSE is calculated
     M = args.monte_carlo_sims  # Number of Monte-Carlo simulations
     L = 1  # Number of consensus iterations

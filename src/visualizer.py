@@ -44,7 +44,7 @@ def get_latest_file(prefix="fcekf", suffix=".pkl", directory="data/"):
     return os.path.join(directory, filtered_files[0]) if filtered_files else None
 
 
-def metrics(args, M, T_RMSE, data):
+def metrics(T_RMSE, data):
     dev_chief_values = []
     dev_deputy1_values = []
     dev_deputy2_values = []
@@ -54,6 +54,7 @@ def metrics(args, M, T_RMSE, data):
     rmse_deputy2_values = []
     rmse_deputy3_values = []
     X_true = data["true"]
+    M = len(data) - 1  # Number of Monte Carlo simulations
     for m in range(M):
         X_est = data[m]
 
@@ -124,7 +125,9 @@ def visualizer_devs(args):
     formation = re.search(r"form(\d+)", data_filepath).group(1)
     with open(data_filepath, "rb") as f:
         data = pickle.load(f)
-    print(f'Plotting data from "{data_filepath}"...')
+    print(
+        f'Plotting data from "{data_filepath}" ran for {len(data) - 1} Monte Carlo Runs...'
+    )
 
     # Simulation parameters
     dt = 60.0  # Time step [s]
@@ -134,7 +137,7 @@ def visualizer_devs(args):
     M = len(data) - 1  # Number of Monte Carlo simulations
 
     # Get data to plot
-    dev_chief, dev_deputy1, dev_deputy2, dev_deputy3 = metrics(args, M, T_RMSE, data)
+    dev_chief, dev_deputy1, dev_deputy2, dev_deputy3 = metrics(T_RMSE, data)
 
     # Plot positions based on screen size
     fig_width = 2 * 6.4  # in inches
@@ -215,9 +218,12 @@ def visualizer_devs(args):
 
 def visualizer_all_devs(args):
     # Load the latest files
+    data_filepath_wlstsq_lm = get_latest_file(prefix=f"wlstsq-lm_form{args.formation}_")
     data_filepath_fcekf = get_latest_file(prefix=f"fcekf_form{args.formation}_")
     data_filepath_hcmci = get_latest_file(prefix=f"hcmci_form{args.formation}_")
     data_filepath_ccekf = get_latest_file(prefix=f"ccekf_form{args.formation}_")
+    with open(data_filepath_wlstsq_lm, "rb") as f:
+        data_wlstsq_lm = pickle.load(f)
     with open(data_filepath_fcekf, "rb") as f:
         data_fcekf = pickle.load(f)
     with open(data_filepath_hcmci, "rb") as f:
@@ -225,7 +231,7 @@ def visualizer_all_devs(args):
     with open(data_filepath_ccekf, "rb") as f:
         data_ccekf = pickle.load(f)
     print(
-        f'Plotting data from "{data_filepath_fcekf}", "{data_filepath_hcmci}" and "{data_filepath_ccekf}"...'
+        f'Plotting data from "{data_filepath_wlstsq_lm}", "{data_filepath_fcekf}", "{data_filepath_hcmci}" and "{data_filepath_ccekf}" ran for {len(data_filepath_wlstsq_lm) - 1}, {len(data_filepath_fcekf) - 1}, {len(data_filepath_hcmci) - 1} and {len(data_filepath_ccekf) - 1} Monte Carlo Runs, respetively...'
     )
 
     # Simulation parameters
@@ -233,17 +239,22 @@ def visualizer_all_devs(args):
     T = np.shape(data_fcekf["true"])[2]  # Duration [min]
     T_RMSE = T - 95  # Duration for RMSE calculation [min]
     time = np.arange(0, T) / dt  # Time vector [h]
-    M = len(data_fcekf) - 1  # Number of Monte Carlo simulations
 
     # Get data to plot
+    (
+        dev_chief_wlstsq_lm,
+        dev_deputy1_wlstsq_lm,
+        dev_deputy2_wlstsq_lm,
+        dev_deputy3_wlstsq_lm,
+    ) = metrics(T_RMSE, data_wlstsq_lm)
     dev_chief_fcekf, dev_deputy1_fcekf, dev_deputy2_fcekf, dev_deputy3_fcekf = metrics(
-        args, M, T_RMSE, data_fcekf
+        T_RMSE, data_fcekf
     )
     dev_chief_hcmci, dev_deputy1_hcmci, dev_deputy2_hcmci, dev_deputy3_hcmci = metrics(
-        args, M, T_RMSE, data_hcmci
+        T_RMSE, data_hcmci
     )
     dev_chief_ccekf, dev_deputy1_ccekf, dev_deputy2_ccekf, dev_deputy3_ccekf = metrics(
-        args, M, T_RMSE, data_ccekf
+        T_RMSE, data_ccekf
     )
 
     # Plot positions based on screen size
@@ -254,6 +265,7 @@ def visualizer_all_devs(args):
     fig, axs = plt.subplots(2, 2, figsize=(fig_width, fig_height))
 
     # Plot 1: Chief
+    axs[0, 0].plot(time, dev_chief_wlstsq_lm, ".-", label="WLSTSQ-LM")
     axs[0, 0].plot(time, dev_chief_fcekf, ".-", label="FCEKF")
     axs[0, 0].plot(time, dev_chief_hcmci, ".-", label="HCMCI")
     axs[0, 0].plot(time, dev_chief_ccekf, ".-", label="CCEKF")
@@ -272,6 +284,7 @@ def visualizer_all_devs(args):
     axs[0, 0].set_title("Chief")
 
     # Plot 2: Deputy 1
+    axs[0, 1].plot(time, dev_deputy1_wlstsq_lm, ".-", label="WLSTSQ-LM")
     axs[0, 1].plot(time, dev_deputy1_fcekf, ".-", label="FCEKF")
     axs[0, 1].plot(time, dev_deputy1_hcmci, ".-", label="HCMCI")
     axs[0, 1].plot(time, dev_deputy1_ccekf, ".-", label="CCEKF")
@@ -290,6 +303,7 @@ def visualizer_all_devs(args):
     axs[0, 1].set_title("Deputy 1")
 
     # Plot 3: Deputy 2
+    axs[1, 0].plot(time, dev_deputy2_wlstsq_lm, ".-", label="WLSTSQ-LM")
     axs[1, 0].plot(time, dev_deputy2_fcekf, ".-", label="FCEKF")
     axs[1, 0].plot(time, dev_deputy2_hcmci, ".-", label="HCMCI")
     axs[1, 0].plot(time, dev_deputy2_ccekf, ".-", label="CCEKF")
@@ -308,6 +322,7 @@ def visualizer_all_devs(args):
     axs[1, 0].set_title("Deputy 2")
 
     # Plot 4: Deputy 3
+    axs[1, 1].plot(time, dev_deputy3_wlstsq_lm, ".-", label="WLSTSQ-LM")
     axs[1, 1].plot(time, dev_deputy3_fcekf, ".-", label="FCEKF")
     axs[1, 1].plot(time, dev_deputy3_hcmci, ".-", label="HCMCI")
     axs[1, 1].plot(time, dev_deputy3_ccekf, ".-", label="CCEKF")
