@@ -231,7 +231,7 @@ def visualizer_all_devs(args):
     with open(data_filepath_ccekf, "rb") as f:
         data_ccekf = pickle.load(f)
     print(
-        f'Plotting data from "{data_filepath_wlstsq_lm}", "{data_filepath_fcekf}", "{data_filepath_hcmci}" and "{data_filepath_ccekf}" ran for {len(data_filepath_wlstsq_lm) - 1}, {len(data_filepath_fcekf) - 1}, {len(data_filepath_hcmci) - 1} and {len(data_filepath_ccekf) - 1} Monte Carlo Runs, respetively...'
+        f'Plotting data from "{data_filepath_wlstsq_lm}", "{data_filepath_fcekf}", "{data_filepath_hcmci}" and "{data_filepath_ccekf}" ran for {len(data_wlstsq_lm) - 1}, {len(data_fcekf) - 1}, {len(data_hcmci) - 1} and {len(data_ccekf) - 1} Monte Carlo Runs, respetively...'
     )
 
     # Simulation parameters
