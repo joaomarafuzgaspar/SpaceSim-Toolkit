@@ -419,4 +419,40 @@ class SatelliteDynamics:
         F = np.eye(len(K1)) + dt / 6 * (dk1_dx + 2 * dk2_dx + 2 * dk3_dx + dk4_dx)
 
         return x_new, F
-    
+
+    def dPhidt(self, x, Phi):
+        """
+        Computes the time derivative of the state transition matrix.
+
+        Parameters:
+        x (np.array): The current state vector (position [m] and velocity [m / s]).
+        Phi (np.array): The state transition matrix.
+
+        Returns:
+        dPhi_dt (np.array): The time derivative of the state transition matrix.
+        """
+        return self.F_jacobian(x) @ Phi
+
+    def Phi(self, dt, x_old):
+        """
+        Computes the state transition matrix.
+
+        Parameters:
+        dt (float): Time step.
+        x_old (np.array): The current state vector (position [m] and velocity [m / s]).
+
+        Returns:
+        Phi (np.array): The state transition matrix.
+        """
+        k1 = self.f_function(x_old)
+        k2 = self.f_function(x_old + dt / 2 * k1)
+        k3 = self.f_function(x_old + dt / 2 * k2)
+
+        # State transition matrix calculation
+        K1 = self.dPhidt(x_old, np.eye(len(x_old)))
+        K2 = self.dPhidt(x_old + dt / 2 * k1, np.eye(len(x_old)) + dt / 2 * K1)
+        K3 = self.dPhidt(x_old + dt / 2 * k2, np.eye(len(x_old)) + dt / 2 * K2)
+        K4 = self.dPhidt(x_old + dt * k3, np.eye(len(x_old)) + dt * K3)
+        Phi = np.eye(len(x_old)) + dt / 6 * (K1 + 2 * K2 + 2 * K3 + K4)
+
+        return Phi
