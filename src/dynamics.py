@@ -419,3 +419,4 @@ class SatelliteDynamics:
         F = np.eye(len(K1)) + dt / 6 * (dk1_dx + 2 * dk2_dx + 2 * dk3_dx + dk4_dx)
 
         return x_new, F
+    

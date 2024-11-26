@@ -194,10 +194,11 @@ class WLSTSQ_LM:
         lambda_0 = 1.0
         X_est_i = X_initial.reshape(-1, 1, order="F")
         lambda_i = lambda_0
-        epsilon = 1e-2
+        epsilon = 1e-6
         max_iter = 100
 
         i = 0
+        
         while i < max_iter:
             r = self.r_function(X_est_i, Y)
             J = self.J_jacobian(X_est_i, Y)
