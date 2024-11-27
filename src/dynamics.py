@@ -1,7 +1,6 @@
 import numpy as np
 
 from earth import Earth, AtmosphericModel
-from tudatpy.astro import element_conversion
 
 
 def rotation_matrix_x(alpha):
@@ -89,16 +88,6 @@ def coe2rv(
         (r_vec_geocentric_equatorial, v_vec_geocentric_equatorial)
     )
 
-    if rv_geocentric_equatorial_vec is None:
-        return element_conversion.keplerian_to_cartesian_elementwise(
-            semi_major_axis=semi_major_axis,
-            eccentricity=eccentricity,
-            inclination=inclination,
-            argument_of_periapsis=argument_of_periapsis,
-            longitude_of_ascending_node=longitude_of_ascending_node,
-            true_anomaly=true_anomaly,
-            gravitational_parameter=earth.mu,
-        )
     return rv_geocentric_equatorial_vec
 
 
@@ -149,18 +138,6 @@ def rv2coe(rv_geocentric_equatorial_vec):
     if v_r < 0:
         true_anomaly = 2 * np.pi - true_anomaly
 
-    if (
-        semi_major_axis is None
-        or eccentricity is None
-        or inclination is None
-        or argument_of_periapsis is None
-        or longitude_of_ascending_node is None
-        or true_anomaly is None
-    ):
-        return element_conversion.cartesian_to_keplerian(
-            cartesian_elements=rv_geocentric_equatorial_vec,
-            gravitational_parameter=earth.mu,
-        )
     return np.array(
         [
             semi_major_axis,
