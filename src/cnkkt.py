@@ -1,5 +1,6 @@
 import numpy as np
 
+from tqdm import tqdm
 from scipy.linalg import solve
 from dynamics import SatelliteDynamics
 
@@ -457,7 +458,7 @@ class CNKKT:
             )
 
         X_est = np.zeros((4*n_x, 1, K - self.W + 1))
-        for n in range(K - self.W + 1):
+        for n in tqdm(range(K - self.W + 1), desc="Windows", leave=False):
             # For the lambdas try to solve the least squares problem that arises from the stationarity KKT condition
             # nabla f + nabla h^T @ lambda = 0
             # this is also part of the warm-start

@@ -523,7 +523,7 @@ def run_simulation(args):
     elif args.algorithm == "cnkkt":
         fcekf = FCEKF(Q, R)
         cnkkt = CNKKT(W, R_chief, r_deputy_pos)
-        for m in tqdm(range(M)):
+        for m in tqdm(range(M), desc="MC runs", leave=True):
             # Observations
             Y = np.zeros((9, 1, T))
             for t in range(T):
