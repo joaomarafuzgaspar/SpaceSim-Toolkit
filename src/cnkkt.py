@@ -380,10 +380,7 @@ class CNKKT:
         max_iter = 100
         x = x_init
         lmbda = lambda_init
-        self.i = None
-        self.L_norms = []
-        self.grad_L_norms = []
-        self.h_norms = []
+        i = None
         for iteration in range(max_iter):
             # Compute the cost function, gradient of the Lagrangian and Hessian of the Lagrangian
             L_x = self.lagrangian(dt, x, lmbda, Y)
@@ -398,12 +395,6 @@ class CNKKT:
             L_norm = np.linalg.norm(L_x)
             grad_L_norm = np.linalg.norm(grad_L_x)
             h_norm = np.linalg.norm(h_x)
-
-            # Store the norms
-            self.L_norms.append(L_norm)
-            self.grad_L_norms.append(grad_L_norm)
-            self.h_norms.append(h_norm)
-
             # Check convergence and print metrics
             if (
                 grad_L_norm < tolerance and h_norm < tolerance
@@ -446,20 +437,14 @@ class CNKKT:
             lmbda += delta_lmbda
 
             # Save the current iteration
-            self.i = iteration + 1
+            i = iteration + 1
 
         return x
 
-    def apply(self, dt, X_initial, Y, X_true):
+    def apply(self, dt, X_initial, Y):
         n_x = 6
         n_p = 3
         K = Y.shape[2]
-        rmse_1 = []
-        rmse_2 = []
-        rmse_3 = []
-        rmse_4 = []
-        NKKT_first_round_stop_iteration = []
-        NKKT_K_minus_W_next_rounds_stop_iteration = []
 
         # Before applying the Newton algorithm for the first time, initialize the initial conditions
         # guess randomly (cold-start) and the next states depending on the initial condition guess and dynamics
@@ -471,14 +456,7 @@ class CNKKT:
                 dt, x_init[4 * n_x * k : 4 * n_x * (k + 1), :]
             )
 
-        p_1_est = np.zeros((n_p, 1, K - self.W + 1))
-        p_2_est = np.zeros((n_p, 1, K - self.W + 1))
-        p_3_est = np.zeros((n_p, 1, K - self.W + 1))
-        p_4_est = np.zeros((n_p, 1, K - self.W + 1))
-        x_1_est = np.zeros((n_x, 1, K - self.W + 1))
-        x_2_est = np.zeros((n_x, 1, K - self.W + 1))
-        x_3_est = np.zeros((n_x, 1, K - self.W + 1))
-        x_4_est = np.zeros((n_x, 1, K - self.W + 1))
+        X_est = np.zeros((4*n_x, 1, K - self.W + 1))
         for n in range(K - self.W + 1):
             # For the lambdas try to solve the least squares problem that arises from the stationarity KKT condition
             # nabla f + nabla h^T @ lambda = 0
@@ -491,69 +469,7 @@ class CNKKT:
             x_est = self.solve_for_each_window(
                 dt, x_init, lambda_init, Y[:, :, n : n + self.W]
             )
-            p_1_est[:, :, n] = self.P @ x_est[:n_x, :]
-            p_2_est[:, :, n] = self.P @ x_est[n_x : 2 * n_x, :]
-            p_3_est[:, :, n] = self.P @ x_est[2 * n_x : 3 * n_x, :]
-            p_4_est[:, :, n] = self.P @ x_est[3 * n_x : 4 * n_x, :]
-            x_1_est[:, :, n] = x_est[:n_x, :]
-            x_2_est[:, :, n] = x_est[n_x : 2 * n_x, :]
-            x_3_est[:, :, n] = x_est[2 * n_x : 3 * n_x, :]
-            x_4_est[:, :, n] = x_est[3 * n_x : 4 * n_x, :]
-
-            # give_me_the_plots(nkkt.i, nkkt.L_norms, nkkt.grad_L_norms, nkkt.h_norms)
-
-            if n == 0:  # Check divergence in the beginning
-                abs_error_init_1 = np.zeros(self.W)
-                abs_error_init_2 = np.zeros(self.W)
-                abs_error_init_3 = np.zeros(self.W)
-                abs_error_init_4 = np.zeros(self.W)
-                for k in range(self.W):
-                    abs_error_init_1[k] = np.linalg.norm(
-                        self.P @ x_est[n_x * (4 * k) : n_x * (4 * k + 1), :]
-                        - self.P @ X_true[:n_x, :, k]
-                    )
-                    abs_error_init_2[k] = np.linalg.norm(
-                        self.P @ x_est[n_x * (4 * k + 1) : n_x * (4 * k + 2), :]
-                        - self.P @ X_true[n_x : 2 * n_x, :, k]
-                    )
-                    abs_error_init_3[k] = np.linalg.norm(
-                        self.P @ x_est[n_x * (4 * k + 2) : n_x * (4 * k + 3), :]
-                        - self.P @ X_true[2 * n_x : 3 * n_x, :, k]
-                    )
-                    abs_error_init_4[k] = np.linalg.norm(
-                        self.P @ x_est[n_x * (4 * k + 3) : n_x * (4 * k + 4), :]
-                        - self.P @ X_true[3 * n_x : 4 * n_x, :, k]
-                    )
-                rmse_init_1 = np.sqrt(np.mean(abs_error_init_1**2))
-                rmse_init_2 = np.sqrt(np.mean(abs_error_init_2**2))
-                rmse_init_3 = np.sqrt(np.mean(abs_error_init_3**2))
-                rmse_init_4 = np.sqrt(np.mean(abs_error_init_4**2))
-                if (
-                    rmse_init_1 > 1e2
-                    or rmse_init_2 > 1e2
-                    or rmse_init_3 > 1e2
-                    or rmse_init_4 > 1e2
-                ):
-                    print(f"This Monte Carlo run diverged!")
-                    # Mimic the propagation for rmse computation below
-                    for k in range(K - self.W + 1):
-                        p_1_est[:, :, k] = self.P @ self.dynamic_model.x_new(
-                            dt, x_est[:n_x, :]
-                        )
-                        p_2_est[:, :, k] = self.P @ self.dynamic_model.x_new(
-                            dt, x_est[n_x : 2 * n_x, :]
-                        )
-                        p_3_est[:, :, k] = self.P @ self.dynamic_model.x_new(
-                            dt, x_est[2 * n_x : 3 * n_x, :]
-                        )
-                        p_4_est[:, :, k] = self.P @ self.dynamic_model.x_new(
-                            dt, x_est[3 * n_x : 4 * n_x, :]
-                        )
-                    break
-                else:
-                    NKKT_first_round_stop_iteration.append(self.i)
-            else:
-                NKKT_K_minus_W_next_rounds_stop_iteration.append(self.i)
+            X_est[:, :, n] = x_est[:4 * n_x, :]
 
             # Get next new guess (warm-start)
             # The initial guess is the second timestamp of the previous window and then propagate the states
@@ -565,55 +481,5 @@ class CNKKT:
                         dt, x_init[4 * n_x * k : 4 * n_x * (k + 1), :]
                     )
                 )
-
-        # After each Monte Carlo Run compute the RMSE_m for each first K - W + 1 iterations
-        abs_error_1 = np.zeros(K - self.W + 1)
-        abs_error_2 = np.zeros(K - self.W + 1)
-        abs_error_3 = np.zeros(K - self.W + 1)
-        abs_error_4 = np.zeros(K - self.W + 1)
-        for k in range(K - self.W + 1):
-            abs_error_1[k] = np.linalg.norm(
-                p_1_est[:, :, k] - self.P @ X_true[:n_x, :, k]
-            )
-            abs_error_2[k] = np.linalg.norm(
-                p_2_est[:, :, k] - self.P @ X_true[n_x : 2 * n_x, :, k]
-            )
-            abs_error_3[k] = np.linalg.norm(
-                p_3_est[:, :, k] - self.P @ X_true[2 * n_x : 3 * n_x, :, k]
-            )
-            abs_error_4[k] = np.linalg.norm(
-                p_4_est[:, :, k] - self.P @ X_true[3 * n_x : 4 * n_x, :, k]
-            )
-        rmse_m_1 = np.sqrt(np.mean(abs_error_1**2))
-        rmse_m_2 = np.sqrt(np.mean(abs_error_2**2))
-        rmse_m_3 = np.sqrt(np.mean(abs_error_3**2))
-        rmse_m_4 = np.sqrt(np.mean(abs_error_4**2))
-        print(f"This MC run RMSE for the first {K - self.W + 1} iterations:")
-        print(f"RMSE_run?_1 = {rmse_m_1}")
-        print(f"RMSE_run?_2 = {rmse_m_2}")
-        print(f"RMSE_run?_3 = {rmse_m_3}")
-        print(f"RMSE_run?_4 = {rmse_m_4}\n")
-        if rmse_m_1 > 0.5 or rmse_m_2 > 0.5 or rmse_m_3 > 0.5 or rmse_m_4 > 0.5:
-            print(
-                "Discarding this Monte Carlo run and going to the next Monte Carlo run...\n"
-            )
-        else:
-            rmse_1.append(rmse_m_1)
-            rmse_2.append(rmse_m_2)
-            rmse_3.append(rmse_m_3)
-            rmse_4.append(rmse_m_4)
-
-        print(
-            f"Average RMSE for the first {K - self.W + 1} iterations for {len(rmse_1)} valid Monte Carlo runs:"
-        )
-        print(f"RMSE_1 = {np.mean(rmse_1)}")
-        print(f"RMSE_2 = {np.mean(rmse_2)}")
-        print(f"RMSE_3 = {np.mean(rmse_3)}")
-        print(f"RMSE_4 = {np.mean(rmse_4)}")
-        print(
-            f"The first round of NKKT converged with {np.mean(NKKT_first_round_stop_iteration)} iterations on average."
-        )
-        print(
-            f"The next {K - self.W} rounds of NKKT converged with {np.mean(NKKT_K_minus_W_next_rounds_stop_iteration)} iterations on average."
-        )
-        return np.concatenate(x_1_est, x_2_est, x_3_est, x_4_est, axis=1)
+                
+        return X_est

@@ -17,6 +17,7 @@ from utils import (
     save_propagation_data,
     get_form_initial_conditions,
 )
+from multiprocessing import Pool
 
 
 def run_tudat_propagation(args):
@@ -537,7 +538,6 @@ def run_simulation(args):
                 )
 
             # Initial state vector and state covariance estimate
-            X_est = np.zeros_like(X_true)
             initial_dev = np.concatenate(
                 (
                     p_pos_initial * np.random.randn(3, 1),
@@ -550,9 +550,9 @@ def run_simulation(args):
                     p_vel_initial * np.random.randn(3, 1),
                 )
             )
-            X_est[:, :, 0] = X_initial + initial_dev
-            X_est = cnkkt.apply(dt, X_est[:, :, 0], Y, X_true)
+            X_est = cnkkt.apply(dt, X_initial + initial_dev, Y)
             X_est_all.append(X_est)
+        X_true = X_true[:, :, :T - W + 1]
 
     # Compute average RMSE
     rmse_chief_values = []

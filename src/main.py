@@ -53,6 +53,7 @@ def main():
     parser.add_argument(
         "-M",
         "--monte-carlo-sims",
+        default=1,
         type=check_positive,
         help="Number of Monte-Carlo simulations to run (must be an integer >= 1)",
     )
