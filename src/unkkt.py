@@ -413,66 +413,41 @@ class UNKKT:
     def hessian_lagrangian(self, X, STM, Y):
         return self.hessian_obj_function(X, STM, Y)
 
-    def solve_for_each_window(self, dt, x_init, lambda_init, Y):
+    def solve_for_each_window(self, x_init, STM, Y):
         n_x = 6
         tolerance = 1e-6
         max_iter = 100
         x = x_init
-        lmbda = lambda_init
         for iteration in range(max_iter):
             # Compute the cost function, gradient of the Lagrangian and Hessian of the Lagrangian
-            L_x = self.lagrangian(dt, x, lmbda, Y)
-            grad_L_x = self.grad_lagrangian(dt, x, lmbda, Y)
-            hessian_L_x = self.hessian_lagrangian(x, Y)
-
-            # Compute the constraints and its Jacobian
-            h_x = self.eq_const_function(dt, x)
-            grad_h_x = self.jacobian_eq_const_function(dt, x)
+            L_x = self.lagrangian(x, STM, Y)
+            grad_L_x = self.grad_lagrangian(x, STM, Y)
+            hessian_L_x = self.hessian_lagrangian(x, STM, Y)
 
             # Calculate norms for convergence tracking
             L_norm = np.linalg.norm(L_x)
             grad_L_norm = np.linalg.norm(grad_L_x)
-            h_norm = np.linalg.norm(h_x)
+            
             # Check convergence and print metrics
-            if (
-                grad_L_norm < tolerance and h_norm < tolerance
-            ) or iteration + 1 == max_iter:
+            if grad_L_norm < tolerance or iteration + 1 == max_iter:
                 print(
-                    f"STOP on Iteration {iteration}\nL_norm = {L_norm}\nGrad_L_norm = {grad_L_norm}\nh_norm = {h_norm}\n"
+                    f"STOP on Iteration {iteration}\nL_norm = {L_norm}\nGrad_L_norm = {grad_L_norm}\n"
                 )
                 break
             else:
                 if iteration == 0:
                     print(
-                        f"Before applying the algorithm\nL_norm = {L_norm}\nGrad_L_norm = {grad_L_norm}\nh_norm = {h_norm}\n"
+                        f"Before applying the algorithm\nL_norm = {L_norm}\nGrad_L_norm = {grad_L_norm}\n"
                     )
                 else:
                     print(
-                        f"Iteration {iteration}\nL_norm = {L_norm}\nGrad_L_norm = {grad_L_norm}\nh_norm = {h_norm}\n"
+                        f"Iteration {iteration}\nL_norm = {L_norm}\nGrad_L_norm = {grad_L_norm}\n"
                     )
 
-            # Form the KKT matrix
-            KKT_matrix = np.block(
-                [
-                    [hessian_L_x, grad_h_x.T],
-                    [
-                        grad_h_x,
-                        np.zeros((4 * n_x * (self.W - 1), 4 * n_x * (self.W - 1))),
-                    ],
-                ]
-            )
-
-            # Form the right-hand side
-            rhs = -np.block([[grad_L_x], [h_x]])
-
             # Solve for the Newton step - this is one iteration
-            delta = solve(KKT_matrix, rhs)
-            delta_x = delta[: x.size]
-            delta_lmbda = delta[x.size :]
-
-            # Update x and lambda
+            # delta_x = solve(hessian_L_x, -grad_L_x)
+            delta_x =  -np.linalg.pinv(hessian_L_x) @ grad_L_x
             x += delta_x
-            lmbda += delta_lmbda
 
         return x
 
