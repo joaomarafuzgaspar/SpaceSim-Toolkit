@@ -127,7 +127,7 @@ class UNKKT:
     def H(self, x_vec):
         return np.concatenate((self.H_jacobian_chief(), self.H_jacobian_deputy(x_vec)))
 
-    def obj_function(self, x_0, STM, y):
+    def obj_function(self, dt, x_0, y):
         n_x = 6
         n_y_1 = 3
         f_x_0 = 0
@@ -137,10 +137,6 @@ class UNKKT:
         x_2_k = x_0[n_x : 2 * n_x, :]
         x_3_k = x_0[2 * n_x : 3 * n_x, :]
         x_4_k = x_0[3 * n_x : 4 * n_x, :]
-        STM_t0_1 = np.eye(n_x)
-        STM_t0_2 = np.eye(n_x)
-        STM_t0_3 = np.eye(n_x)
-        STM_t0_4 = np.eye(n_x)
 
         # Iterate over all sliding window time steps
         for k in range(self.W):
@@ -178,18 +174,14 @@ class UNKKT:
 
             if k < self.W - 1:
                 # Get x_1(k), x_2(k), x_3(k), x_4(k) from the state vector x_0
-                x_1_k = STM[:n_x, :n_x, k + 1] @ x_1_k
-                x_2_k = STM[n_x : 2 * n_x, n_x : 2 * n_x, k + 1] @ x_2_k
-                x_3_k = STM[2 * n_x : 3 * n_x, 2 * n_x : 3 * n_x, k + 1] @ x_3_k
-                x_4_k = STM[3 * n_x : 4 * n_x, 3 * n_x : 4 * n_x, k + 1] @ x_4_k
-                STM_t0_1 = STM[:n_x, :n_x, k + 1] @ STM_t0_1
-                STM_t0_2 = STM[n_x : 2 * n_x, n_x : 2 * n_x, k + 1] @ STM_t0_2
-                STM_t0_3 = STM[2 * n_x : 3 * n_x, 2 * n_x : 3 * n_x, k + 1] @ STM_t0_3
-                STM_t0_4 = STM[3 * n_x : 4 * n_x, 3 * n_x : 4 * n_x, k + 1] @ STM_t0_4
+                x_1_k = self.dynamic_model.x_new(dt, x_1_k)
+                x_2_k = self.dynamic_model.x_new(dt, x_2_k)
+                x_3_k = self.dynamic_model.x_new(dt, x_3_k)
+                x_4_k = self.dynamic_model.x_new(dt, x_4_k)
 
         return f_x_0
 
-    def grad_obj_function(self, x_0, STM, y):
+    def grad_obj_function(self, dt, x_0, y):
         n_x = 6
         n_y_1 = 3
         grad_f_x_0 = np.zeros_like(x_0)
@@ -257,18 +249,22 @@ class UNKKT:
 
             if k < self.W - 1:
                 # Get x_1(k), x_2(k), x_3(k), x_4(k) from the state vector x_0
-                x_1_k = STM[:n_x, :n_x, k + 1] @ x_1_k
-                x_2_k = STM[n_x : 2 * n_x, n_x : 2 * n_x, k + 1] @ x_2_k
-                x_3_k = STM[2 * n_x : 3 * n_x, 2 * n_x : 3 * n_x, k + 1] @ x_3_k
-                x_4_k = STM[3 * n_x : 4 * n_x, 3 * n_x : 4 * n_x, k + 1] @ x_4_k
-                STM_t0_1 = STM[:n_x, :n_x, k + 1] @ STM_t0_1
-                STM_t0_2 = STM[n_x : 2 * n_x, n_x : 2 * n_x, k + 1] @ STM_t0_2
-                STM_t0_3 = STM[2 * n_x : 3 * n_x, 2 * n_x : 3 * n_x, k + 1] @ STM_t0_3
-                STM_t0_4 = STM[3 * n_x : 4 * n_x, 3 * n_x : 4 * n_x, k + 1] @ STM_t0_4
+                STM_t0_1_old = STM_t0_1
+                STM_t0_2_old = STM_t0_2
+                STM_t0_3_old = STM_t0_3
+                STM_t0_4_old = STM_t0_4
+                x_1_k, STM_t0_1 = self.dynamic_model.x_new_and_F(dt, x_1_k)
+                x_2_k, STM_t0_2 = self.dynamic_model.x_new_and_F(dt, x_2_k)
+                x_3_k, STM_t0_3 = self.dynamic_model.x_new_and_F(dt, x_3_k)
+                x_4_k, STM_t0_4 = self.dynamic_model.x_new_and_F(dt, x_4_k)
+                STM_t0_1 = STM_t0_1 @ STM_t0_1_old
+                STM_t0_2 = STM_t0_2 @ STM_t0_2_old
+                STM_t0_3 = STM_t0_3 @ STM_t0_3_old
+                STM_t0_4 = STM_t0_4 @ STM_t0_4_old
 
         return grad_f_x_0
 
-    def hessian_obj_function(self, x_0, STM, y):
+    def hessian_obj_function(self, dt, x_0, y):
         n_x = 6
         n_y_1 = 3
         hessian_f_x_0 = np.zeros(
@@ -393,36 +389,40 @@ class UNKKT:
 
             if k < self.W - 1:
                 # Get x_1(k), x_2(k), x_3(k), x_4(k) from the state vector x_0
-                x_1_k = STM[:n_x, :n_x, k + 1] @ x_1_k
-                x_2_k = STM[n_x : 2 * n_x, n_x : 2 * n_x, k + 1] @ x_2_k
-                x_3_k = STM[2 * n_x : 3 * n_x, 2 * n_x : 3 * n_x, k + 1] @ x_3_k
-                x_4_k = STM[3 * n_x : 4 * n_x, 3 * n_x : 4 * n_x, k + 1] @ x_4_k
-                STM_t0_1 = STM[:n_x, :n_x, k + 1] @ STM_t0_1
-                STM_t0_2 = STM[n_x : 2 * n_x, n_x : 2 * n_x, k + 1] @ STM_t0_2
-                STM_t0_3 = STM[2 * n_x : 3 * n_x, 2 * n_x : 3 * n_x, k + 1] @ STM_t0_3
-                STM_t0_4 = STM[3 * n_x : 4 * n_x, 3 * n_x : 4 * n_x, k + 1] @ STM_t0_4
+                STM_t0_1_old = STM_t0_1
+                STM_t0_2_old = STM_t0_2
+                STM_t0_3_old = STM_t0_3
+                STM_t0_4_old = STM_t0_4
+                x_1_k, STM_t0_1 = self.dynamic_model.x_new_and_F(dt, x_1_k)
+                x_2_k, STM_t0_2 = self.dynamic_model.x_new_and_F(dt, x_2_k)
+                x_3_k, STM_t0_3 = self.dynamic_model.x_new_and_F(dt, x_3_k)
+                x_4_k, STM_t0_4 = self.dynamic_model.x_new_and_F(dt, x_4_k)
+                STM_t0_1 = STM_t0_1 @ STM_t0_1_old
+                STM_t0_2 = STM_t0_2 @ STM_t0_2_old
+                STM_t0_3 = STM_t0_3 @ STM_t0_3_old
+                STM_t0_4 = STM_t0_4 @ STM_t0_4_old
 
         return hessian_f_x_0
 
-    def lagrangian(self, X, STM, Y):
-        return self.obj_function(X, STM, Y)
+    def lagrangian(self, dt, X, Y):
+        return self.obj_function(dt, X, Y)
 
-    def grad_lagrangian(self, X, STM, Y):
-        return self.grad_obj_function(X, STM, Y)
+    def grad_lagrangian(self, dt, X, Y):
+        return self.grad_obj_function(dt, X, Y)
 
-    def hessian_lagrangian(self, X, STM, Y):
-        return self.hessian_obj_function(X, STM, Y)
+    def hessian_lagrangian(self, dt, X, Y):
+        return self.hessian_obj_function(dt, X, Y)
 
-    def solve_for_each_window(self, x_init, STM, Y):
+    def solve_for_each_window(self, dt, x_init, Y):
         n_x = 6
-        tolerance = 1e-6
-        max_iter = 100
+        tolerance = 1e0
+        max_iter = 20
         x = x_init
         for iteration in range(max_iter):
             # Compute the cost function, gradient of the Lagrangian and Hessian of the Lagrangian
-            L_x = self.lagrangian(x, STM, Y)
-            grad_L_x = self.grad_lagrangian(x, STM, Y)
-            hessian_L_x = self.hessian_lagrangian(x, STM, Y)
+            L_x = self.lagrangian(dt, x, Y)
+            grad_L_x = self.grad_lagrangian(dt, x, Y)
+            hessian_L_x = self.hessian_lagrangian(dt, x, Y)
 
             # Calculate norms for convergence tracking
             L_norm = np.linalg.norm(L_x)
@@ -445,13 +445,12 @@ class UNKKT:
                     )
 
             # Solve for the Newton step - this is one iteration
-            # delta_x = solve(hessian_L_x, -grad_L_x)
-            delta_x =  -np.linalg.pinv(hessian_L_x) @ grad_L_x
+            delta_x = solve(hessian_L_x, -grad_L_x)
             x += delta_x
 
         return x
 
-    def apply(self, X_initial, STM, Y):
+    def apply(self, dt, X_initial, Y):
         n_x = 6
         K = Y.shape[2]
 
@@ -465,22 +464,12 @@ class UNKKT:
         for n in tqdm(range(K - self.W + 1), desc="Windows", leave=False):
             # For the lambdas try to solve the least squares problem that arises from the stationarity KKT condition
             x_est = self.solve_for_each_window(
-                x_init, STM[:, :, n : n + self.W], Y[:, :, n : n + self.W]
+                dt, x_init, Y[:, :, n : n + self.W]
             )
             X_est[:, :, n] = x_est[: 4 * n_x, :]
 
             # Get next new guess (warm-start)
             # The initial guess is the previous window estimate second timestamp value
-            x_init[:n_x, :] = STM[:n_x, :n_x, n + 1] @ x_est[:n_x, :]
-            x_init[n_x : 2 * n_x, :] = (
-                STM[n_x : 2 * n_x, n_x : 2 * n_x, n + 1] @ x_est[n_x : 2 * n_x, :]
-            )
-            x_init[2 * n_x : 3 * n_x, :] = (
-                STM[2 * n_x : 3 * n_x, 2 * n_x : 3 * n_x, n + 1]
-                @ x_est[2 * n_x : 3 * n_x, :]
-            )
-            x_init[3 * n_x : 4 * n_x, :] = (
-                STM[3 * n_x :, 3 * n_x :, n + 1] @ x_est[3 * n_x :, :]
-            )
+            x_init = self.dynamic_model.x_new(dt, x_est)
 
         return X_est

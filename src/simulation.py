@@ -556,25 +556,6 @@ def run_simulation(args):
     elif args.algorithm == "unkkt":
         fcekf = FCEKF(Q, R)
         unkkt = UNKKT(W, R_chief, r_deputy_pos)
-
-        # Get the State Transition Matrix for all the satellites at each time step for UNKKT
-        n_x = 6
-        STM = np.zeros((24, 24, T + 1))
-        STM[:, :, 0] = np.eye(24)
-        for t in range(T - 1):
-            STM[:n_x, :n_x, t + 1] = X_true[:n_x, :, t + 1] @ np.linalg.pinv(
-                X_true[:n_x, :, t]
-            )
-            STM[n_x : 2 * n_x, n_x : 2 * n_x, t + 1] = X_true[
-                n_x : 2 * n_x, :, t + 1
-            ] @ np.linalg.pinv(X_true[n_x : 2 * n_x, :, t])
-            STM[2 * n_x : 3 * n_x, 2 * n_x : 3 * n_x, t + 1] = X_true[
-                2 * n_x : 3 * n_x, :, t + 1
-            ] @ np.linalg.pinv(X_true[2 * n_x : 3 * n_x, :, t])
-            STM[3 * n_x :, 3 * n_x :, t + 1] = X_true[
-                3 * n_x :, :, t + 1
-            ] @ np.linalg.pinv(X_true[3 * n_x :, :, t])
-
         for m in tqdm(range(M), desc="MC runs", leave=True):
             # Observations
             Y = np.zeros((9, 1, T))
@@ -602,7 +583,7 @@ def run_simulation(args):
                     p_vel_initial * np.random.randn(3, 1),
                 )
             )
-            X_est = unkkt.apply(X_initial + initial_dev, STM, Y)
+            X_est = unkkt.apply(dt, X_initial + initial_dev, Y)
             X_est_all.append(X_est)
         X_true = X_true[:, :, : T - W + 1]
 
