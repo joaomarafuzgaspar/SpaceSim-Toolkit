@@ -169,6 +169,7 @@ cython_debug/
 data/*.pkl
 data/*.csv
 data/*.mat
+data/cluster/
 
 # Videos
 videos/
