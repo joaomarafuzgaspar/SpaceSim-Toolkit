@@ -251,9 +251,9 @@ def visualizer_all_devs(args):
         dev_deputy1_wlstsq_lm,
         dev_deputy2_wlstsq_lm,
         dev_deputy3_wlstsq_lm,
-    ) = metrics(T_RMSE, data_wlstsq_lm)
+    ) = metrics(0, data_wlstsq_lm)
     dev_chief_fcekf, dev_deputy1_fcekf, dev_deputy2_fcekf, dev_deputy3_fcekf = metrics(
-        0, data_fcekf
+        T_RMSE, data_fcekf
     )
     dev_chief_hcmci, dev_deputy1_hcmci, dev_deputy2_hcmci, dev_deputy3_hcmci = metrics(
         T_RMSE, data_hcmci
