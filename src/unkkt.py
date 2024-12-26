@@ -7,17 +7,18 @@ from dynamics import SatelliteDynamics
 
 class UNKKT:
     """
-    This class implements the Levenberg-Marquardt algorithm for the Weighted Least Squares (WLSTSQ) estimator.
+    This class implements the unconstrained version of the Karush-Kuhn-Tucker (KKT)
+    conditions using the Newton method for optimization in satellite dynamics.
     """
 
     def __init__(self, W, R_chief, r_deputy_pos):
         """
-        Initialize the WLSTSQ class.
+        Initialize the UNKKT class.
 
         Parameters:
-        Q (np.array): Process noise covariance.
-        R (np.array): Measurement noise covariance.
-        SatelliteDynamics (class): Satellite dynamics model.
+        W (int): Sliding window size for optimization.
+        R_chief (np.array): Measurement noise covariance matrix for the chief satellite.
+        r_deputy_pos (float): Measurement noise standard deviation for deputy positions.
         """
         # Define window size
         self.W = W
@@ -33,17 +34,22 @@ class UNKKT:
 
     def h_function_chief(self, x_vec):
         """
-        Computes the measurement vector based on the current state vector.
-        The measurement vector includes position components.
+        Compute the measurement vector for the chief satellite's position.
 
         Parameters:
-        x_vec (np.array): The current state vector of the satellite (position [km] and velocity [km / s]).
+        x_vec (np.array): Current state vector of the satellite.
+
+        Returns:
+        np.array: Position components of the state vector.
         """
         return x_vec[0:3]
 
     def H_jacobian_chief(self):
         """
-        Computes the Jacobian of the measurement function.
+        Compute the Jacobian of the measurement function for the chief satellite.
+
+        Returns:
+        np.array: Jacobian matrix for the chief satellite measurements.
         """
         H = np.zeros((3, 24))
         H[0:3, 0:3] = np.eye(3)
@@ -51,13 +57,13 @@ class UNKKT:
 
     def h_function_deputy(self, x_vec):
         """
-        Computes the measurement vector based on the current state vector.
+        Compute the measurement vector for relative distances between satellites.
 
         Parameters:
-        x_vec (np.array): The current state vector of the satellite (position [km] and velocity [km / s]).
+        x_vec (np.array): Current state vector of all satellites.
 
         Returns:
-        y (np.array): The measurement vector of the satellite (range [km]).
+        np.array: Measurement vector containing distances between satellites.
         """
         r_chief = x_vec[:3]
         r_deputy1 = x_vec[6:9]
@@ -84,13 +90,13 @@ class UNKKT:
 
     def H_jacobian_deputy(self, x_vec):
         """
-        Computes the Jacobian of the measurement function.
+        Compute the Jacobian of the measurement function for relative distances between satellites.
 
         Parameters:
-        x_vec (np.array): The current state vector of the satellite (position [km] and velocity [km / s]).
+        x_vec (np.array): Current state vector of all satellites.
 
         Returns:
-        H (np.array): The Jacobian of the measurement function.
+        np.array: Jacobian matrix for relative distances.
         """
         r_chief = x_vec[:3]
         r_deputy1 = x_vec[6:9]
@@ -120,14 +126,43 @@ class UNKKT:
         return H
 
     def h(self, x_vec):
+        """
+        Combine measurement functions for the chief and deputies.
+
+        Parameters:
+        x_vec (np.array): State vector of all satellites.
+
+        Returns:
+        np.array: Combined measurement vector.
+        """
         return np.concatenate(
             [self.h_function_chief(x_vec), self.h_function_deputy(x_vec)]
         )
 
     def H(self, x_vec):
+        """
+        Combine Jacobians for both the chief and deputies.
+
+        Parameters:
+        x_vec (np.array): State vector of all satellites.
+
+        Returns:
+        np.array: Combined Jacobian matrix.
+        """
         return np.concatenate((self.H_jacobian_chief(), self.H_jacobian_deputy(x_vec)))
 
     def obj_function(self, dt, x_0, y):
+        """
+        Compute the objective function for the optimization problem.
+
+        Parameters:
+        dt (float): Time step.
+        x_0 (np.array): Initial state vector.
+        y (np.array): Measurement data over the time window.
+
+        Returns:
+        float: Value of the objective function.
+        """
         n_x = 6
         n_y_1 = 3
         f_x_0 = 0
@@ -182,6 +217,17 @@ class UNKKT:
         return f_x_0
 
     def grad_obj_function(self, dt, x_0, y):
+        """
+        Compute the gradient of the objective function.
+
+        Parameters:
+        dt (float): Time step.
+        x_0 (np.array): Initial state vector.
+        y (np.array): Measurement data over the time window.
+
+        Returns:
+        np.array: Gradient of the objective function.
+        """
         n_x = 6
         n_y_1 = 3
         grad_f_x_0 = np.zeros_like(x_0)
@@ -265,6 +311,17 @@ class UNKKT:
         return grad_f_x_0
 
     def hessian_obj_function(self, dt, x_0, y):
+        """
+        Compute the Hessian of the objective function.
+
+        Parameters:
+        dt (float): Time step.
+        x_0 (np.array): Initial state vector.
+        y (np.array): Measurement data over the time window.
+
+        Returns:
+        np.array: Hessian matrix of the objective function.
+        """
         n_x = 6
         n_y_1 = 3
         hessian_f_x_0 = np.zeros(
@@ -405,15 +462,59 @@ class UNKKT:
         return hessian_f_x_0
 
     def lagrangian(self, dt, X, Y):
+        """
+        Compute the Lagrangian (equivalent to the objective function for unconstrained optimization).
+
+        Parameters:
+        dt (float): Time step.
+        X (np.array): State vector over the time window.
+        Y (np.array): Measurement data.
+
+        Returns:
+        float: Value of the Lagrangian.
+        """
         return self.obj_function(dt, X, Y)
 
     def grad_lagrangian(self, dt, X, Y):
+        """
+        Compute the gradient of the Lagrangian.
+
+        Parameters:
+        dt (float): Time step.
+        X (np.array): State vector over the time window.
+        Y (np.array): Measurement data.
+        
+        Returns:
+        np.array: Gradient of the Lagrangian.
+        """
         return self.grad_obj_function(dt, X, Y)
 
     def hessian_lagrangian(self, dt, X, Y):
+        """
+        Compute the Hessian of the Lagrangian.
+
+        Parameters:
+        dt (float): Time step.
+        X (np.array): State vector over the time window.
+        Y (np.array): Measurement data.
+        
+        Returns:
+        np.array: Hessian of the Lagrangian.
+        """
         return self.hessian_obj_function(dt, X, Y)
 
     def solve_for_each_window(self, dt, x_init, Y):
+        """
+        Solve the optimization problem for a single sliding window using Newton's method.
+
+        Parameters:
+        dt (float): Time step.
+        x_init (np.array): Initial state guess.
+        Y (np.array): Measurement data for the sliding window.
+        
+        Returns:
+        np.array: Optimized state vector for the sliding window.
+        """
         n_x = 6
         tolerance = 1e0
         max_iter = 20
@@ -427,7 +528,7 @@ class UNKKT:
             # Calculate norms for convergence tracking
             L_norm = np.linalg.norm(L_x)
             grad_L_norm = np.linalg.norm(grad_L_x)
-            
+
             # Check convergence and print metrics
             if grad_L_norm < tolerance or iteration + 1 == max_iter:
                 print(
@@ -451,6 +552,17 @@ class UNKKT:
         return x
 
     def apply(self, dt, X_initial, Y):
+        """
+        Apply the UNKKT method across all sliding windows.
+
+        Parameters:
+        dt (float): Time step.
+        X_initial (np.array): Initial guess of the state vector.
+        Y (np.array): Measurement data.
+        
+        Returns:
+        np.array: Estimated state vector over all time steps.
+        """
         n_x = 6
         K = Y.shape[2]
 
@@ -463,9 +575,7 @@ class UNKKT:
         X_est = np.zeros((4 * n_x, 1, K - self.W + 1))
         for n in tqdm(range(K - self.W + 1), desc="Windows", leave=False):
             # For the lambdas try to solve the least squares problem that arises from the stationarity KKT condition
-            x_est = self.solve_for_each_window(
-                dt, x_init, Y[:, :, n : n + self.W]
-            )
+            x_est = self.solve_for_each_window(dt, x_init, Y[:, :, n : n + self.W])
             X_est[:, :, n] = x_est[: 4 * n_x, :]
 
             # Get next new guess (warm-start)
