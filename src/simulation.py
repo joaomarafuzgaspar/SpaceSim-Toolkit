@@ -4,10 +4,12 @@ import pandas as pd
 
 # from numba import jit  # FIXME: speeding up the code
 from tqdm import tqdm
+from wlstsq_lm import WLSTSQ_LM
 from fcekf import FCEKF
 from hcmci import HCMCI
 from ccekf import EKF, CCEKF
-from wlstsq_lm import WLSTSQ_LM
+from cnkkt import CNKKT
+from unkkt import UNKKT
 from scipy.linalg import block_diag
 from dynamics import SatelliteDynamics
 from utils import (
@@ -50,6 +52,7 @@ def run_simulation(args):
     N = 4  # Number of satellites
     gamma = N  # Consensus gain 1
     pi = 1 / N  # Consensus gain 2
+    W = 100  # Window size
 
     # Initial state vector and get the true state vectors (propagation) FIXME: Add run_propagation() here
     X_initial = get_form_initial_conditions(args.formation)
@@ -155,7 +158,6 @@ def run_simulation(args):
             )
             X_est[:, :, 0] = X_initial + initial_dev
             P = np.diag(initial_dev.reshape(-1) ** 2)
-
             for t in range(1, T):
                 X_est[:, :, t], P = fcekf.apply(dt, X_est[:, :, t - 1], P, Y[:, :, t])
             X_est_all.append(X_est)
@@ -518,6 +520,72 @@ def run_simulation(args):
                     axis=0,
                 )
             X_est_all.append(X_est)
+    elif args.algorithm == "cnkkt":
+        fcekf = FCEKF(Q, R)
+        cnkkt = CNKKT(W, R_chief, r_deputy_pos)
+        for m in tqdm(range(M), desc="MC runs", leave=True):
+            # Observations
+            Y = np.zeros((9, 1, T))
+            for t in range(T):
+                Y[:, :, t] = np.concatenate(
+                    (
+                        fcekf.h_function_chief(X_true[:, :, t]),
+                        fcekf.h_function_deputy(X_true[:, :, t]),
+                    ),
+                    axis=0,
+                ) + np.random.normal(
+                    0, np.sqrt(np.diag(R)).reshape((9, 1)), size=(9, 1)
+                )
+
+            # Initial state vector and state covariance estimate
+            initial_dev = np.concatenate(
+                (
+                    p_pos_initial * np.random.randn(3, 1),
+                    p_vel_initial * np.random.randn(3, 1),
+                    p_pos_initial * np.random.randn(3, 1),
+                    p_vel_initial * np.random.randn(3, 1),
+                    p_pos_initial * np.random.randn(3, 1),
+                    p_vel_initial * np.random.randn(3, 1),
+                    p_pos_initial * np.random.randn(3, 1),
+                    p_vel_initial * np.random.randn(3, 1),
+                )
+            )
+            X_est = cnkkt.apply(dt, X_initial + initial_dev, Y)
+            X_est_all.append(X_est)
+        X_true = X_true[:, :, : T - W + 1]
+    elif args.algorithm == "unkkt":
+        fcekf = FCEKF(Q, R)
+        unkkt = UNKKT(W, R_chief, r_deputy_pos)
+        for m in tqdm(range(M), desc="MC runs", leave=True):
+            # Observations
+            Y = np.zeros((9, 1, T))
+            for t in range(T):
+                Y[:, :, t] = np.concatenate(
+                    (
+                        fcekf.h_function_chief(X_true[:, :, t]),
+                        fcekf.h_function_deputy(X_true[:, :, t]),
+                    ),
+                    axis=0,
+                ) + np.random.normal(
+                    0, np.sqrt(np.diag(R)).reshape((9, 1)), size=(9, 1)
+                )
+
+            # Initial state vector and state covariance estimate
+            initial_dev = np.concatenate(
+                (
+                    p_pos_initial * np.random.randn(3, 1),
+                    p_vel_initial * np.random.randn(3, 1),
+                    p_pos_initial * np.random.randn(3, 1),
+                    p_vel_initial * np.random.randn(3, 1),
+                    p_pos_initial * np.random.randn(3, 1),
+                    p_vel_initial * np.random.randn(3, 1),
+                    p_pos_initial * np.random.randn(3, 1),
+                    p_vel_initial * np.random.randn(3, 1),
+                )
+            )
+            X_est = unkkt.apply(dt, X_initial + initial_dev, Y)
+            X_est_all.append(X_est)
+        X_true = X_true[:, :, : T - W + 1]
 
     # Compute average RMSE
     rmse_chief_values = []

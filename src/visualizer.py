@@ -5,7 +5,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from utils import rmse
-from matlab import engine
 from datetime import datetime
 
 
@@ -222,6 +221,8 @@ def visualizer_all_devs(args):
     data_filepath_fcekf = get_latest_file(prefix=f"fcekf_form{args.formation}_")
     data_filepath_hcmci = get_latest_file(prefix=f"hcmci_form{args.formation}_")
     data_filepath_ccekf = get_latest_file(prefix=f"ccekf_form{args.formation}_")
+    data_filepath_cnkkt = get_latest_file(prefix=f"cnkkt_form{args.formation}_")
+    data_filepath_unkkt = get_latest_file(prefix=f"unkkt_form{args.formation}_")
     with open(data_filepath_wlstsq_lm, "rb") as f:
         data_wlstsq_lm = pickle.load(f)
     with open(data_filepath_fcekf, "rb") as f:
@@ -230,14 +231,18 @@ def visualizer_all_devs(args):
         data_hcmci = pickle.load(f)
     with open(data_filepath_ccekf, "rb") as f:
         data_ccekf = pickle.load(f)
+    with open(data_filepath_cnkkt, "rb") as f:
+        data_cnkkt = pickle.load(f)
+    with open(data_filepath_unkkt, "rb") as f:
+        data_unkkt = pickle.load(f)
     print(
-        f'Plotting data from "{data_filepath_wlstsq_lm}", "{data_filepath_fcekf}", "{data_filepath_hcmci}" and "{data_filepath_ccekf}" ran for {len(data_wlstsq_lm) - 1}, {len(data_fcekf) - 1}, {len(data_hcmci) - 1} and {len(data_ccekf) - 1} Monte Carlo Runs, respetively...'
+        f'Plotting data from "path" (Monte Carlo runs): "{data_filepath_wlstsq_lm}" ({len(data_wlstsq_lm) - 1}), "{data_filepath_fcekf}" ({len(data_fcekf) - 1}), "{data_filepath_hcmci}" ({len(data_hcmci) - 1}), "{data_filepath_ccekf}" ({len(data_ccekf) - 1}), "{data_filepath_cnkkt}" ({len(data_cnkkt) - 1}), "{data_filepath_unkkt}" ({len(data_unkkt) - 1})...'
     )
 
     # Simulation parameters
     dt = 60.0  # Time step [s]
     T = np.shape(data_fcekf["true"])[2]  # Duration [min]
-    T_RMSE = T - 95  # Duration for RMSE calculation [min]
+    T_RMSE =  T - 95  # Duration for RMSE calculation [min]
     time = np.arange(0, T) / dt  # Time vector [h]
 
     # Get data to plot
@@ -246,7 +251,7 @@ def visualizer_all_devs(args):
         dev_deputy1_wlstsq_lm,
         dev_deputy2_wlstsq_lm,
         dev_deputy3_wlstsq_lm,
-    ) = metrics(T_RMSE, data_wlstsq_lm)
+    ) = metrics(0, data_wlstsq_lm)
     dev_chief_fcekf, dev_deputy1_fcekf, dev_deputy2_fcekf, dev_deputy3_fcekf = metrics(
         T_RMSE, data_fcekf
     )
@@ -255,6 +260,12 @@ def visualizer_all_devs(args):
     )
     dev_chief_ccekf, dev_deputy1_ccekf, dev_deputy2_ccekf, dev_deputy3_ccekf = metrics(
         T_RMSE, data_ccekf
+    )
+    dev_chief_cnkkt, dev_deputy1_cnkkt, dev_deputy2_cnkkt, dev_deputy3_cnkkt = metrics(
+        0, data_cnkkt
+    )
+    dev_chief_unkkt, dev_deputy1_unkkt, dev_deputy2_unkkt, dev_deputy3_unkkt = metrics(
+        0, data_unkkt
     )
 
     # Plot positions based on screen size
@@ -269,6 +280,8 @@ def visualizer_all_devs(args):
     axs[0, 0].plot(time, dev_chief_fcekf, ".-", label="FCEKF")
     axs[0, 0].plot(time, dev_chief_hcmci, ".-", label="HCMCI")
     axs[0, 0].plot(time, dev_chief_ccekf, ".-", label="CCEKF")
+    axs[0, 0].plot(time[:len(dev_chief_cnkkt)], dev_chief_cnkkt, ".-", label="$\mathrm{cNKKT}_W$")
+    axs[0, 0].plot(time[:len(dev_chief_unkkt)], dev_chief_unkkt, ".-", label="$\mathrm{uNKKT}_W$")
     axs[0, 0].grid(which="major", color="#DDDDDD", zorder=1)
     axs[0, 0].grid(which="minor", color="#DDDDDD", linestyle=(0, (1, 3)), zorder=2)
     axs[0, 0].grid(True, which="both")
@@ -288,6 +301,8 @@ def visualizer_all_devs(args):
     axs[0, 1].plot(time, dev_deputy1_fcekf, ".-", label="FCEKF")
     axs[0, 1].plot(time, dev_deputy1_hcmci, ".-", label="HCMCI")
     axs[0, 1].plot(time, dev_deputy1_ccekf, ".-", label="CCEKF")
+    axs[0, 1].plot(time[:len(dev_deputy1_cnkkt)], dev_deputy1_cnkkt, ".-", label="$\mathrm{cNKKT}_W$")
+    axs[0, 1].plot(time[:len(dev_deputy1_unkkt)], dev_deputy1_unkkt, ".-", label="$\mathrm{uNKKT}_W$")
     axs[0, 1].grid(which="major", color="#DDDDDD", zorder=1)
     axs[0, 1].grid(which="minor", color="#DDDDDD", linestyle=(0, (1, 3)), zorder=2)
     axs[0, 1].grid(True, which="both")
@@ -307,6 +322,8 @@ def visualizer_all_devs(args):
     axs[1, 0].plot(time, dev_deputy2_fcekf, ".-", label="FCEKF")
     axs[1, 0].plot(time, dev_deputy2_hcmci, ".-", label="HCMCI")
     axs[1, 0].plot(time, dev_deputy2_ccekf, ".-", label="CCEKF")
+    axs[1, 0].plot(time[:len(dev_deputy2_cnkkt)], dev_deputy2_cnkkt, ".-", label="$\mathrm{cNKKT}_W$")
+    axs[1, 0].plot(time[:len(dev_deputy2_unkkt)], dev_deputy2_unkkt, ".-", label="$\mathrm{uNKKT}_W$")
     axs[1, 0].grid(which="major", color="#DDDDDD", zorder=1)
     axs[1, 0].grid(which="minor", color="#DDDDDD", linestyle=(0, (1, 3)), zorder=2)
     axs[1, 0].grid(True, which="both")
@@ -326,6 +343,8 @@ def visualizer_all_devs(args):
     axs[1, 1].plot(time, dev_deputy3_fcekf, ".-", label="FCEKF")
     axs[1, 1].plot(time, dev_deputy3_hcmci, ".-", label="HCMCI")
     axs[1, 1].plot(time, dev_deputy3_ccekf, ".-", label="CCEKF")
+    axs[1, 1].plot(time[:len(dev_deputy3_cnkkt)], dev_deputy3_cnkkt, ".-", label="$\mathrm{cNKKT}_W$")
+    axs[1, 1].plot(time[:len(dev_deputy3_unkkt)], dev_deputy3_unkkt, ".-", label="$\mathrm{uNKKT}_W$")
     axs[1, 1].grid(which="major", color="#DDDDDD", zorder=1)
     axs[1, 1].grid(which="minor", color="#DDDDDD", linestyle=(0, (1, 3)), zorder=2)
     axs[1, 1].grid(True, which="both")
@@ -348,26 +367,7 @@ def visualizer_all_devs(args):
 
 def run_visualizer(args):
     # Call the visualizer script
-    if args.visualize == "orbits":
-        eng = engine.start_matlab()
-        matlab_functions_path = os.path.abspath("../SpaceSim-Toolkit/src")
-        eng.addpath(matlab_functions_path, nargout=0)
-        print("Displaying MATLAB figure with the orbits...")
-        try:
-            if args.formation:
-                data_filepath = get_latest_file(
-                    prefix=f"prop_form{args.formation}", suffix=".mat"
-                )
-                formation = args.formation
-            else:
-                data_filepath = get_latest_file(prefix="prop", suffix=".mat")
-                formation = re.search(r"form(\d+)", data_filepath).group(1)
-            eng.visualizer_orbits(data_filepath, formation, nargout=0)
-        except engine.MatlabExecutionError as e:
-            print(f"An error occurred: {e}")
-        finally:
-            eng.quit()
-    elif args.visualize == "all_deviations":
+    if args.visualize == "all_deviations":
         print(
             f"Displaying all algorithms estimates deviations for Formation {'I' if args.formation == 1 else 'II' if args.formation == 2 else 'Unknown'}..."
         )

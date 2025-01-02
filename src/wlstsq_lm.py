@@ -14,9 +14,9 @@ class WLSTSQ_LM:
         Initialize the WLSTSQ class.
 
         Parameters:
-        Q (np.array): Process noise covariance.
-        R (np.array): Measurement noise covariance.
-        SatelliteDynamics (class): Satellite dynamics model.
+        Q (np.array): Process noise covariance matrix.
+        R (np.array): Measurement noise covariance matrix.
+        SatelliteDynamics (class): Satellite dynamics model instance.
         """
         # Define noise covariances
         self.Q = Q  # Process noise covariance
@@ -26,17 +26,22 @@ class WLSTSQ_LM:
 
     def h_function_chief(self, x_vec):
         """
-        Computes the measurement vector based on the current state vector.
-        The measurement vector includes position components.
+        Compute the measurement vector for the chief satellite's position.
 
         Parameters:
-        x_vec (np.array): The current state vector of the satellite (position [km] and velocity [km / s]).
+        x_vec (np.array): Current state vector of the satellite (position [km] and velocity [km/s]).
+
+        Returns:
+        np.array: Position components of the state vector.
         """
         return x_vec[0:3]
 
     def H_jacobian_chief(self):
         """
-        Computes the Jacobian of the measurement function.
+        Compute the Jacobian of the measurement function for the chief satellite.
+
+        Returns:
+        np.array: Jacobian matrix of the measurement function.
         """
         H = np.zeros((3, 24))
         H[0:3, 0:3] = np.eye(3)
@@ -44,13 +49,13 @@ class WLSTSQ_LM:
 
     def h_function_deputy(self, x_vec):
         """
-        Computes the measurement vector based on the current state vector.
+        Compute the measurement vector for relative distances between satellites.
 
         Parameters:
-        x_vec (np.array): The current state vector of the satellite (position [km] and velocity [km / s]).
+        x_vec (np.array): Current state vector of the satellites.
 
         Returns:
-        y (np.array): The measurement vector of the satellite (range [km]).
+        np.array: Measurement vector containing distances between satellites.
         """
         r_chief = x_vec[:3]
         r_deputy1 = x_vec[6:9]
@@ -77,13 +82,13 @@ class WLSTSQ_LM:
 
     def H_jacobian_deputy(self, x_vec):
         """
-        Computes the Jacobian of the measurement function.
+        Compute the Jacobian of the measurement function for relative distances between satellites.
 
         Parameters:
-        x_vec (np.array): The current state vector of the satellite (position [km] and velocity [km / s]).
+        x_vec (np.array): Current state vector of the satellites.
 
         Returns:
-        H (np.array): The Jacobian of the measurement function.
+        np.array: Jacobian matrix for the relative distances.
         """
         r_chief = x_vec[:3]
         r_deputy1 = x_vec[6:9]
@@ -113,14 +118,42 @@ class WLSTSQ_LM:
         return H
 
     def h(self, x_vec):
+        """
+        Combine the measurement functions for both the chief and deputies.
+
+        Parameters:
+        x_vec (np.array): State vector of the satellites.
+
+        Returns:
+        np.array: Combined measurement vector.
+        """
         return np.concatenate(
             [self.h_function_chief(x_vec), self.h_function_deputy(x_vec)]
         )
 
     def H(self, x_vec):
+        """
+        Combine the Jacobians for both the chief and deputies.
+
+        Parameters:
+        x_vec (np.array): State vector of the satellites.
+
+        Returns:
+        np.array: Combined Jacobian matrix.
+        """
         return np.concatenate((self.H_jacobian_chief(), self.H_jacobian_deputy(x_vec)))
 
     def r_function(self, X, Y):
+        """
+        Compute the residual vector for the state and measurements.
+
+        Parameters:
+        X (np.array): State vector across all time steps.
+        Y (np.array): Measurement data.
+
+        Returns:
+        np.array: Residual vector.
+        """
         K = Y.shape[2]
         n_x = 6
         n_y_1 = 3
@@ -153,6 +186,16 @@ class WLSTSQ_LM:
         return r
 
     def J_jacobian(self, X, Y):
+        """
+        Compute the Jacobian of the residual function.
+
+        Parameters:
+        X (np.array): State vector across all time steps.
+        Y (np.array): Measurement data.
+
+        Returns:
+        np.array: Jacobian of the residual function.
+        """
         K = Y.shape[2]
         n_x = 6
         n_y_1 = 3
@@ -187,9 +230,30 @@ class WLSTSQ_LM:
         return J
 
     def cost_function(self, X, Y):
+        """
+        Compute the cost function (residual norm squared).
+
+        Parameters:
+        X (np.array): State vector across all time steps.
+        Y (np.array): Measurement data.
+
+        Returns:
+        float: Cost function value.
+        """
         return np.linalg.norm(self.r_function(X, Y)) ** 2
 
     def apply(self, dt, X_initial, Y):
+        """
+        Run the Levenberg-Marquardt algorithm to estimate the state.
+
+        Parameters:
+        dt (float): Time step.
+        X_initial (np.array): Initial guess of the state vector.
+        Y (np.array): Measurement data.
+
+        Returns:
+        np.array: Estimated state vector.
+        """
         self.dt = dt
         lambda_0 = 1.0
         X_est_i = X_initial.reshape(-1, 1, order="F")
@@ -198,7 +262,7 @@ class WLSTSQ_LM:
         max_iter = 100
 
         i = 0
-        
+
         while i < max_iter:
             r = self.r_function(X_est_i, Y)
             J = self.J_jacobian(X_est_i, Y)

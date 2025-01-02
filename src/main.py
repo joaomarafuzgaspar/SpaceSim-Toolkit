@@ -47,12 +47,13 @@ def main():
         "-a",
         "--algorithm",
         type=str,
-        choices=["wlstsq-lm", "fcekf", "hcmci", "ccekf"],
-        help="Navigation algorithm to simulate (wlstsq-lm for WLSTSQ-LM, fcekf for FCEKF, hcmci for HCMCI, or ccekf for CCEKF)",
+        choices=["wlstsq-lm", "fcekf", "hcmci", "ccekf", "cnkkt", "unkkt"],
+        help="Navigation algorithm to simulate (wlstsq-lm for WLSTSQ-LM, fcekf for FCEKF, hcmci for HCMCI, ccekf for CCEKF, cnkkt for CNKKT, or unkkt for UNKKT)",
     )
     parser.add_argument(
         "-M",
         "--monte-carlo-sims",
+        default=1,
         type=check_positive,
         help="Number of Monte-Carlo simulations to run (must be an integer >= 1)",
     )
