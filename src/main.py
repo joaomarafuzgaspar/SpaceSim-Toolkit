@@ -47,8 +47,8 @@ def main():
         "-a",
         "--algorithm",
         type=str,
-        choices=["wlstsq-lm", "fcekf", "hcmci", "ccekf", "cnkkt", "unkkt"],
-        help="Navigation algorithm to simulate (wlstsq-lm for WLSTSQ-LM, fcekf for FCEKF, hcmci for HCMCI, ccekf for CCEKF, cnkkt for CNKKT, or unkkt for UNKKT)",
+        choices=["wlstsq-lm", "fcekf", "hcmci", "ccekf", "cnkkt", "unkkt", "approxh-newton"],
+        help="Navigation algorithm to simulate (wlstsq-lm for WLSTSQ-LM, fcekf for FCEKF, hcmci for HCMCI, ccekf for CCEKF, cnkkt for CNKKT, unkkt for UNKKT, or approxh-newton for approxH-Newton)",
     )
     parser.add_argument(
         "-M",

@@ -10,6 +10,7 @@ from hcmci import HCMCI
 from ccekf import EKF, CCEKF
 from cnkkt import CNKKT
 from unkkt import UNKKT
+from approxh_newton import approxH_Newton
 from scipy.linalg import block_diag
 from dynamics import SatelliteDynamics
 from utils import (
@@ -586,6 +587,37 @@ def run_simulation(args):
             X_est = unkkt.apply(dt, X_initial + initial_dev, Y)
             X_est_all.append(X_est)
         X_true = X_true[:, :, : T - W + 1]
+    elif args.algorithm == "approxh-newton":
+        approxh_newton = approxH_Newton(W, R_chief, r_deputy_pos)
+        for m in tqdm(range(M), desc="MC runs", leave=True):
+            # Observations
+            Y = np.zeros((9, 1, T))
+            for t in range(T):
+                Y[:, :, t] = np.concatenate(
+                    (
+                        approxh_newton.h_function_chief(X_true[:, :, t]),
+                        approxh_newton.h_function_deputy(X_true[:, :, t]),
+                    ),
+                    axis=0,
+                ) + np.random.normal(
+                    0, np.sqrt(np.diag(R)).reshape((9, 1)), size=(9, 1)
+                )
+
+            # Initial state vector and state covariance estimate
+            initial_dev = np.concatenate(
+                (
+                    p_pos_initial * np.random.randn(3, 1),
+                    p_vel_initial * np.random.randn(3, 1),
+                    p_pos_initial * np.random.randn(3, 1),
+                    p_vel_initial * np.random.randn(3, 1),
+                    p_pos_initial * np.random.randn(3, 1),
+                    p_vel_initial * np.random.randn(3, 1),
+                    p_pos_initial * np.random.randn(3, 1),
+                    p_vel_initial * np.random.randn(3, 1),
+                )
+            )
+            X_est = approxh_newton.apply(dt, X_initial + initial_dev, Y, X_true)
+            X_est_all.append(X_est)
 
     # Compute average RMSE
     rmse_chief_values = []
