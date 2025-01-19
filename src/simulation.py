@@ -11,6 +11,7 @@ from ccekf import EKF, CCEKF
 from cnkkt import CNKKT
 from unkkt import UNKKT
 from approxh_newton import approxH_Newton
+from mm_newton import MM_Newton
 from scipy.linalg import block_diag
 from dynamics import SatelliteDynamics
 from utils import (
@@ -617,6 +618,51 @@ def run_simulation(args):
                 )
             )
             X_est = approxh_newton.apply(dt, X_initial + initial_dev, Y, X_true)
+            X_est_all.append(X_est)
+    elif args.algorithm == "mm-newton":
+        mm_newton = MM_Newton(W, R_chief, r_deputy_pos)
+        for m in tqdm(range(M), desc="MC runs", leave=True):
+            # Observations
+            Y = np.zeros((9, 1, T))
+            for t in range(T):
+                Y[:, :, t] = np.concatenate(
+                    (
+                        mm_newton.h_function_chief(X_true[:, :, t]),
+                        mm_newton.h_function_deputy(X_true[:, :, t]),
+                    ),
+                    axis=0,
+                ) + np.random.normal(
+                    0, np.sqrt(np.diag(R)).reshape((9, 1)), size=(9, 1)
+                )
+
+            np.random.seed(42)
+            X_est = np.zeros_like(X_true)
+            # Initial state vector and state covariance estimate
+            initial_dev = np.concatenate(
+                (
+                    p_pos_initial * np.random.randn(3, 1),
+                    p_vel_initial * np.random.randn(3, 1),
+                    p_pos_initial * np.random.randn(3, 1),
+                    p_vel_initial * np.random.randn(3, 1),
+                    p_pos_initial * np.random.randn(3, 1),
+                    p_vel_initial * np.random.randn(3, 1),
+                    p_pos_initial * np.random.randn(3, 1),
+                    p_vel_initial * np.random.randn(3, 1),
+                )
+            )
+            X_est[:, :, 0] = X_initial + initial_dev
+            for t in range(T - 1):
+                X_est[:, :, t + 1] = SatelliteDynamics().x_new(dt, X_est[:, :, t])
+
+            # Observations
+            Y = np.zeros((9, 1, T))
+            for t in range(T):
+                Y[:, :, t] = mm_newton.h(X_true[:, :, t]) + np.random.normal(0, np.sqrt(np.diag(R)).reshape((9, 1)), size=(9, 1))
+                
+            Y = np.zeros((9, 1, T))
+            for t in range(T):
+                Y[:, :, t] = mm_newton.h(X_true[:, :, t]) + np.random.normal(0, np.sqrt(np.diag(R)).reshape((9, 1)), size=(9, 1))
+            X_est = mm_newton.apply(dt, X_initial + initial_dev, Y, X_true)
             X_est_all.append(X_est)
 
     # Compute average RMSE
