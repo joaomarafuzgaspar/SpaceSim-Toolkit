@@ -635,8 +635,6 @@ def run_simulation(args):
                     0, np.sqrt(np.diag(R)).reshape((9, 1)), size=(9, 1)
                 )
 
-            np.random.seed(42)
-            X_est = np.zeros_like(X_true)
             # Initial state vector and state covariance estimate
             initial_dev = np.concatenate(
                 (
@@ -650,18 +648,6 @@ def run_simulation(args):
                     p_vel_initial * np.random.randn(3, 1),
                 )
             )
-            X_est[:, :, 0] = X_initial + initial_dev
-            for t in range(T - 1):
-                X_est[:, :, t + 1] = SatelliteDynamics().x_new(dt, X_est[:, :, t])
-
-            # Observations
-            Y = np.zeros((9, 1, T))
-            for t in range(T):
-                Y[:, :, t] = mm_newton.h(X_true[:, :, t]) + np.random.normal(0, np.sqrt(np.diag(R)).reshape((9, 1)), size=(9, 1))
-                
-            Y = np.zeros((9, 1, T))
-            for t in range(T):
-                Y[:, :, t] = mm_newton.h(X_true[:, :, t]) + np.random.normal(0, np.sqrt(np.diag(R)).reshape((9, 1)), size=(9, 1))
             X_est = mm_newton.apply(dt, X_initial + initial_dev, Y, X_true)
             X_est_all.append(X_est)
 
