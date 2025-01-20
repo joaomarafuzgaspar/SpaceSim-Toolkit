@@ -619,6 +619,7 @@ def run_simulation(args):
             )
             X_est = approxh_newton.apply(dt, X_initial + initial_dev, Y, X_true)
             X_est_all.append(X_est)
+        X_true = X_true[:, :, : T - W + 1]
     elif args.algorithm == "mm-newton":
         mm_newton = MM_Newton(W, R_chief, r_deputy_pos)
         for m in tqdm(range(M), desc="MC runs", leave=True):
@@ -650,6 +651,7 @@ def run_simulation(args):
             )
             X_est = mm_newton.apply(dt, X_initial + initial_dev, Y, X_true)
             X_est_all.append(X_est)
+        X_true = X_true[:, :, : T - W + 1]
 
     # Compute average RMSE
     rmse_chief_values = []
