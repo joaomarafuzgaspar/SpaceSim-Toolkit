@@ -31,6 +31,10 @@ class UNKKT:
         self.P = np.array([[1, 0, 0, 0, 0, 0], [0, 1, 0, 0, 0, 0], [0, 0, 1, 0, 0, 0]])
 
         self.dynamic_model = SatelliteDynamics()
+        
+        # Store the cost function and gradient norm values
+        self.cost_function_values = []
+        self.grad_norm_values = []
 
     def h_function_chief(self, x_vec):
         """
@@ -528,6 +532,10 @@ class UNKKT:
             # Calculate norms for convergence tracking
             L_norm = np.linalg.norm(L_x)
             grad_L_norm = np.linalg.norm(grad_L_x)
+            
+            # Store the norms
+            self.cost_function_values.append(L_x[0][0])
+            self.grad_norm_values.append(grad_L_norm)
 
             # Check convergence and print metrics
             if grad_L_norm < tolerance or iteration + 1 == max_iter:

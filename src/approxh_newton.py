@@ -27,6 +27,10 @@ class approxH_Newton:
         # Define Newton parameters
         self.grad_tol = 1e0
         self.max_iter = 20
+        
+        # Store the cost function and gradient norm values
+        self.cost_function_values = []
+        self.grad_norm_values = []
 
     def h_function_chief(self, x_vec):
         return x_vec[0:3]
@@ -368,6 +372,10 @@ class approxH_Newton:
             # Convergence tracking
             cost_function_value = L_x[0][0]
             grad_norm_value = np.linalg.norm(grad_L_x)
+            
+            # Store the cost function and gradient norm values
+            self.cost_function_values.append(cost_function_value)
+            self.grad_norm_values.append(grad_norm_value)
 
             # Compute the changes in the cost function, gradient and global error
             if prev_cost_function_value is not None:

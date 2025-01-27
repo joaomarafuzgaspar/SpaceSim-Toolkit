@@ -32,6 +32,12 @@ class MM_Newton:
         self.mm_tol = 1e0
         self.mm_max_iter = 5
 
+        # Store the cost function and gradient norm values
+        self.cost_function_values = []
+        self.grad_norm_values = []
+        self.surrogate_function_values = []
+        self.surrogate_grad_norm_values = []
+
     def h_function_chief(self, x_vec):
         return x_vec[0:3]
 
@@ -617,6 +623,12 @@ class MM_Newton:
                 # Convergence tracking
                 cost_function_value = L_x[0][0]
                 grad_norm_value = np.linalg.norm(grad_L_x)
+                
+                # Store the cost function and gradient norm values
+                self.surrogate_function_values.append(cost_function_value)
+                self.surrogate_grad_norm_values.append(grad_norm_value)
+                self.cost_function_values.append(self.obj_function(dt, x, Y, None)[0][0])
+                self.grad_norm_values.append(np.linalg.norm(self.grad_obj_function(dt, x, Y, None)))
 
                 # Compute the changes in the cost function, gradient and global error
                 if prev_cost_function_value is not None:
