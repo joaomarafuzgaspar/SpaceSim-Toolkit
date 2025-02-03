@@ -5,6 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from utils import rmse
+from matlab import engine
 from datetime import datetime
 
 
@@ -367,7 +368,26 @@ def visualizer_all_devs(args):
 
 def run_visualizer(args):
     # Call the visualizer script
-    if args.visualize == "all_deviations":
+    if args.visualize == "orbits":
+        eng = engine.start_matlab()
+        matlab_functions_path = os.path.abspath("../SpaceSim-Toolkit/src")
+        eng.addpath(matlab_functions_path, nargout=0)
+        try:
+            if args.formation:
+                data_filepath = get_latest_file(
+                    prefix=f"prop_form{args.formation}", suffix=".mat"
+                )
+                formation = args.formation
+            else:
+                data_filepath = get_latest_file(prefix="prop", suffix=".mat")
+                formation = re.search(r"form(\d+)", data_filepath).group(1)
+            print(f"Displaying MATLAB figure with the orbits from {data_filepath}...")
+            eng.visualizer_orbits(data_filepath, formation, nargout=0)
+        except engine.MatlabExecutionError as e:
+            print(f"An error occurred: {e}")
+        finally:
+            eng.quit()
+    elif args.visualize == "all_deviations":
         print(
             f"Displaying all algorithms estimates deviations for Formation {'I' if args.formation == 1 else 'II' if args.formation == 2 else 'Unknown'}..."
         )
