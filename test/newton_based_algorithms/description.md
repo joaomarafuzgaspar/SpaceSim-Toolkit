@@ -4,6 +4,7 @@
 
 - `approxh_newton.ipynb`: Uses np.random.seed(42). FIXME
 - `approxh_newton2.ipynb`: Uses np.random.seed(43). FIXME
+- `centralized_newton_with_dynamics` (08/02/2025): Include dynamics in the finite-horizon cost function. The true states are propagated using TudatPy and matrix Q is computed using our propagators behaviour compared to the true states.
 - `cnkkt.ipynb`: FIXME
 - `comparison_newton_based.ipynb`: FIXME
 - `mm_newton.ipynb`: FIXME
@@ -15,7 +16,6 @@
 - `unkkt_bearings.ipynb`: FIXME
 - `unkkt_bearings_new_network.ipynb`: FIXME
 - `unkkt_new_network.ipynb`: FIXME
-- `centralized_newton_with_dynamics` (08/02/2025): Include dynamics in the finite-horizon cost function. The true states are propagated using TudatPy and matrix Q is computed using our propagators behaviour compared to the true states.
 - `unkkt.ipynb`: FIXME
 - `unkkt2.ipynb`: FIXME
 - `visualizer_nkkt.ipynb`: FIXME
