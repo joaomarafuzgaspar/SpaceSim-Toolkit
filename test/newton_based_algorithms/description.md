@@ -1,4 +1,4 @@
-## Last updated: 03/02/2025
+## Last updated: 08/02/2025
 # Files Description
 
 
@@ -12,11 +12,12 @@
 - `mm_newton_different_params.ipynb`: FIXME
 - `mm_newton_redundant_obs.ipynb `: FIXME
 - `mm_newton_updated_params.ipynb`: FIXME
-- `unkkt.ipynb`: FIXME
-- `unkkt2.ipynb`: FIXME
 - `unkkt_bearings.ipynb`: FIXME
 - `unkkt_bearings_new_network.ipynb`: FIXME
 - `unkkt_new_network.ipynb`: FIXME
+- `centralized_newton_with_dynamics` (08/02/2025): Include dynamics in the finite-horizon cost function. The true states are propagated using TudatPy and matrix Q is computed using our propagators behaviour compared to the true states.
+- `unkkt.ipynb`: FIXME
+- `unkkt2.ipynb`: FIXME
 - `visualizer_nkkt.ipynb`: FIXME
 
 

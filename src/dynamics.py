@@ -2,6 +2,16 @@ import numpy as np
 
 from earth import Earth, AtmosphericModel
 
+# Load tudatpy modules
+from tudatpy.interface import spice
+from tudatpy.util import result2array
+from tudatpy import numerical_simulation
+from tudatpy.numerical_simulation import (
+    environment_setup,
+    propagation_setup,
+    estimation_setup,
+)
+
 
 def rotation_matrix_x(alpha):
     """Returns the 3D rotation matrix around the X-axis for a given angle alpha."""
@@ -433,3 +443,150 @@ class SatelliteDynamics:
         Phi = np.eye(len(x_old)) + dt / 6 * (K1 + 2 * K2 + 2 * K3 + K4)
 
         return Phi
+
+
+class Propagator:
+    def __init__(
+        self,
+        simulation_start_epoch,
+        simulation_end_epoch,
+        fixed_step_size,
+        initial_conditions,
+    ):
+        # Initialize spacecraft class
+        generic_spacecraft = SatelliteDynamics()
+
+        # Load SPICE kernels
+        spice.load_standard_kernels()
+
+        # Create default body settings
+        bodies_to_create = ["Sun", "Moon", "Venus", "Earth", "Mars", "Jupiter"]
+
+        # Create default body settings for bodies_to_create, with "Earth"/"J2000" as the global frame origin and orientation
+        global_frame_origin = "Earth"
+        global_frame_orientation = "J2000"
+        body_settings = environment_setup.get_default_body_settings(
+            bodies_to_create, global_frame_origin, global_frame_orientation
+        )
+        body_settings.get("Earth").atmosphere_settings = (
+            environment_setup.atmosphere.nrlmsise00()
+        )
+
+        # Create system of bodies
+        bodies = environment_setup.create_system_of_bodies(body_settings)
+
+        # Add satellite bodies to the system and set their mass
+        mass = generic_spacecraft.m
+        spacecrafts = ["Chief", "Deputy1", "Deputy2", "Deputy3"]
+        for spacecraft in spacecrafts:
+            bodies.create_empty_body(spacecraft)
+            bodies.get(spacecraft).mass = mass
+
+        # Add the aerodynamic interface to the environment
+        reference_area = generic_spacecraft.A_drag
+        drag_coefficient = generic_spacecraft.C_drag
+        aero_coefficient_settings = environment_setup.aerodynamic_coefficients.constant(
+            reference_area, [drag_coefficient, 0.0, 0.0]
+        )
+        for spacecraft in spacecrafts:
+            environment_setup.add_aerodynamic_coefficient_interface(
+                bodies, spacecraft, aero_coefficient_settings
+            )
+
+        # Define radiation pressure settings
+        reference_area_radiation = generic_spacecraft.A_drag
+        radiation_pressure_coefficient = 0
+        occulting_bodies_dict = dict()
+        occulting_bodies_dict["Sun"] = ["Earth"]
+
+        # Create and add the radiation pressure interface to the environment
+        radiation_pressure_settings = environment_setup.radiation_pressure.cannonball(
+            "Sun",
+            reference_area_radiation,
+            radiation_pressure_coefficient,
+            occulting_bodies=occulting_bodies_dict["Sun"],
+        )
+        for spacecraft in spacecrafts:
+            environment_setup.add_radiation_pressure_interface(
+                bodies, spacecraft, radiation_pressure_settings
+            )
+
+        # Define accelerations acting on each vehicle
+        #   1. Earth’s gravity field EGM96 spherical harmonic expansion up to degree and order 24
+        #   2. Atmospheric drag NRLMSISE-00 model
+        #   3. Cannon ball solar radiation pressure, assuming constant reflectivity coefficient and radiation area
+        #   4. Third-body perturbations of the Sun, Moon, Venus, Mars and Jupiter
+        accelerations_settings = dict(
+            Sun=[
+                propagation_setup.acceleration.point_mass_gravity(),
+                propagation_setup.acceleration.cannonball_radiation_pressure(),
+            ],
+            Moon=[propagation_setup.acceleration.point_mass_gravity()],
+            Venus=[propagation_setup.acceleration.point_mass_gravity()],
+            Earth=[
+                propagation_setup.acceleration.spherical_harmonic_gravity(24, 24),
+                propagation_setup.acceleration.aerodynamic(),
+            ],
+            Mars=[propagation_setup.acceleration.point_mass_gravity()],
+            Jupiter=[propagation_setup.acceleration.point_mass_gravity()],
+        )
+        acceleration_settings = {}
+        bodies_to_propagate = []
+        central_bodies = []
+        for spacecraft in spacecrafts:
+            acceleration_settings[spacecraft] = accelerations_settings
+            bodies_to_propagate.append(spacecraft)
+            central_bodies.append("Earth")
+
+        # Create acceleration models
+        acceleration_models = propagation_setup.create_acceleration_models(
+            bodies, acceleration_settings, bodies_to_propagate, central_bodies
+        )
+
+        # Create numerical integrator settings
+        integrator_settings = propagation_setup.integrator.runge_kutta_4(
+            fixed_step_size
+        )
+
+        # Create termination settings
+        termination_condition = propagation_setup.propagator.time_termination(
+            simulation_end_epoch
+        )
+
+        # Create propagation settings
+        propagator_settings = propagation_setup.propagator.translational(
+            central_bodies,
+            acceleration_models,
+            bodies_to_propagate,
+            initial_conditions,
+            simulation_start_epoch,
+            integrator_settings,
+            termination_condition,
+        )
+
+        # Setup parameters settings to propagate the state transition matrix
+        parameter_settings = estimation_setup.parameter.initial_states(
+            propagator_settings, bodies
+        )
+
+        # Create the parameters that will be estimated
+        parameters_to_estimate = estimation_setup.create_parameter_set(
+            parameter_settings, bodies
+        )
+
+        # Create the variational equation solver and propagate the dynamics
+        self.variational_equations_solver = (
+            numerical_simulation.create_variational_equations_solver(
+                bodies,
+                propagator_settings,
+                parameters_to_estimate,
+                simulate_dynamics_on_creation=True,
+            )
+        )
+
+    def run(self):
+        # Extract the resulting state history
+        states = self.variational_equations_solver.state_history
+        states = result2array(states)[:, 1:]
+
+        return states
