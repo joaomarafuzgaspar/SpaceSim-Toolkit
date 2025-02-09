@@ -41,11 +41,6 @@ class MM_Newton:
     def h_function_chief(self, x_vec):
         return x_vec[0:3]
 
-    def H_jacobian_chief(self):
-        H = np.zeros((3, 24))
-        H[0:3, 0:3] = np.eye(3)
-        return H
-
     def h_function_deputy(self, x_vec):
         """
         Compute the measurement vector for relative distances between satellites.
@@ -233,7 +228,7 @@ class MM_Newton:
                 z_3_k = self.dynamic_model.x_new(dt, z_3_k)
                 z_4_k = self.dynamic_model.x_new(dt, z_4_k)
 
-        return f_x_0
+        return f_x_0 / self.W
 
     def grad_obj_function(self, dt, x_0, y, z_0=None):
         n_x = 6
@@ -381,7 +376,7 @@ class MM_Newton:
                 z_3_k = self.dynamic_model.x_new(dt, z_3_k)
                 z_4_k = self.dynamic_model.x_new(dt, z_4_k)
 
-        return grad_f_x_0
+        return grad_f_x_0 / self.W
 
     def hessian_obj_function(self, dt, x_0, y, z_0=None):
         n_x = 6
@@ -600,7 +595,7 @@ class MM_Newton:
                 z_3_k = self.dynamic_model.x_new(dt, z_3_k)
                 z_4_k = self.dynamic_model.x_new(dt, z_4_k)
 
-        return hessian_f_x_0
+        return hessian_f_x_0 / self.W
 
     def solve_for_each_window(self, dt, x_init, Y, x_true):
         x = x_init
