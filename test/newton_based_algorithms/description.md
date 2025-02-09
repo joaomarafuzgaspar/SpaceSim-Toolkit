@@ -1,10 +1,10 @@
-## Last updated: 08/02/2025
+## Last updated: 09/02/2025
 # Files Description
 
 
 - `approxh_newton.ipynb`: Uses np.random.seed(42). FIXME
 - `approxh_newton2.ipynb`: Uses np.random.seed(43). FIXME
-- `centralized_newton_with_dynamics` (08/02/2025): Include dynamics in the finite-horizon cost function. The true states are propagated using TudatPy and matrix Q is computed using our propagators behaviour compared to the true states.
+- `centralized_newton_with_dynamics` (09/02/2025): Include dynamics in the finite-horizon cost function. The true states are propagated using TudatPy and matrix Q is computed using our propagators behaviour compared to the true states. The algorithm is struggling to converge to the optimal solution, as the hessian formulation/computation seems not to be as accurate as possible because possibly second-order derivative terms are missing.
 - `cnkkt.ipynb`: FIXME
 - `comparison_newton_based.ipynb`: FIXME
 - `mm_newton.ipynb`: FIXME
