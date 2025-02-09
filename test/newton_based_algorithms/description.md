@@ -13,6 +13,7 @@
 - `mm_newton_different_params.ipynb`: FIXME
 - `mm_newton_redundant_obs.ipynb `: FIXME
 - `mm_newton_updated_params.ipynb`: FIXME
+- `tree_newton.py` (09/02/2025): This framework uses the exact version for the hessian matrix for the tree of the observation coupling graph.  
 - `unkkt_bearings.ipynb`: FIXME
 - `unkkt_bearings_new_network.ipynb`: FIXME
 - `unkkt_new_network.ipynb`: FIXME
