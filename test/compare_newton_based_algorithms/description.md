@@ -1,0 +1,5 @@
+## Last updated: 12/02/2025
+# Files Description
+
+
+- `comparison_newton_based.ipynb` (12/02/2025): Visualization of the cost function, gradient norm, and relative absolute position errors over time for Newton-based frameworks: Centralized Newton (unkkt), Approximated Hessian Newton (approxh_newton), and Majorization-Minimization with Newton's method as the inner loop (mm_newton). The true states are propagated using TudatPy, and matrix Q is computed by comparing our propagators' behavior to the true states. For each horizon, the optimization problem is solved for the initial conditions and then propagated until the end of the window; the final value is what is plotted in the position error plot. This should be taken as a reference in this repository, as the algorithms (frameworks) are now causal, similar to Kalman Filters.
