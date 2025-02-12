@@ -7,6 +7,12 @@ try:
     from tudatpy.interface import spice
     from tudatpy.util import result2array
     from tudatpy import numerical_simulation
+    from tudatpy.numerical_simulation import (
+        environment_setup,
+        propagation_setup,
+        estimation_setup,
+    )
+
     TUDATPY_AVAILABLE = True
 except ModuleNotFoundError:
     TUDATPY_AVAILABLE = False
