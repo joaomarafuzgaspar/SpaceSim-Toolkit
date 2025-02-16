@@ -73,6 +73,60 @@ class Tree_Newton:
             [self.h_function_chief(x_vec), self.h_function_deputy(x_vec)]
         )
 
+    def original_obj_function(self, dt, x_0, y):
+        n_x = 6
+        n_y_1 = 3
+        f_x_0 = 0
+
+        # Extract x_1(0), x_2(0), x_3(0), x_4(0) from flattened state vector x_0
+        x_1_k = x_0[:n_x, :]
+        x_2_k = x_0[n_x : 2 * n_x, :]
+        x_3_k = x_0[2 * n_x : 3 * n_x, :]
+        x_4_k = x_0[3 * n_x : 4 * n_x, :]
+
+        # Iterate over all sliding window time steps
+        for k in range(self.W):
+            # Absolute residual term: observed data y for each state
+            y_1_k = y[:n_y_1, :, k]
+            y_rel_k = y[n_y_1:, :, k]
+
+            # Update the cost function with the residuals for self-measurements
+            residual = y_1_k - self.P @ x_1_k
+            f_x_0 += 1 / 2 * residual.T @ np.linalg.inv(self.R_chief) @ residual
+
+            # Pairwise relative measurements
+            y_21_k = y_rel_k[0]
+            y_23_k = y_rel_k[1]
+            y_24_k = y_rel_k[2]
+            y_31_k = y_rel_k[3]
+            y_34_k = y_rel_k[4]
+            y_41_k = y_rel_k[5]
+
+            # Process pairwise relative residuals for each pair
+            pairs = [
+                (2, 1, x_2_k, x_1_k, y_21_k),  # (2, 1)
+                (2, 3, x_2_k, x_3_k, y_23_k),  # (2, 3)
+                (2, 4, x_2_k, x_4_k, y_24_k),  # (2, 4)
+                (3, 1, x_3_k, x_1_k, y_31_k),  # (3, 1)
+                (3, 4, x_3_k, x_4_k, y_34_k),  # (3, 4)
+                (4, 1, x_4_k, x_1_k, y_41_k),  # (4, 1)
+            ]
+
+            # Iterate over each pair and update the cost function with the residuals for pairwise measurements
+            for i, j, x_i_k, x_j_k, y_ij_k in pairs:
+                d_ij_k_vec = self.P @ x_i_k - self.P @ x_j_k
+                d_ij_k = np.linalg.norm(d_ij_k_vec)
+                f_x_0 += (y_ij_k - d_ij_k) ** 2 / (2 * self.r_deputy_pos**2)
+
+            if k < self.W - 1:
+                # Get x_1(k), x_2(k), x_3(k), x_4(k) from the state vector x_0
+                x_1_k = self.dynamic_model.x_new(dt, x_1_k)
+                x_2_k = self.dynamic_model.x_new(dt, x_2_k)
+                x_3_k = self.dynamic_model.x_new(dt, x_3_k)
+                x_4_k = self.dynamic_model.x_new(dt, x_4_k)
+
+        return f_x_0 / self.W
+
     def obj_function(self, dt, x_0, y):
         n_x = 6
         n_y_1 = 3
@@ -350,7 +404,7 @@ class Tree_Newton:
 
         for iteration in range(self.max_iter):
             # Compute the cost function, gradient and approximated Hessian
-            L_x = self.obj_function(dt, x, Y)
+            L_x = self.original_obj_function(dt, x, Y)
             grad_L_x = self.grad_obj_function(dt, x, Y)
             hessian_L_x = self.hessian_obj_function(dt, x, Y)
 
