@@ -462,7 +462,8 @@ class Tree_Newton:
             )
 
             # Solve for the Newton step
-            delta_x = solve(hessian_L_x, -grad_L_x)
+            # delta_x = solve(hessian_L_x, -grad_L_x)
+            delta_x = -np.linalg.pinv(hessian_L_x) @ grad_L_x
             x += delta_x
 
         return x
