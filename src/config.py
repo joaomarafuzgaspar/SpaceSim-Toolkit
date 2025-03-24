@@ -23,7 +23,7 @@ class SimulationConfig:
     grad_norm_order_mag = True
     grad_norm_tol = 1e-6
     max_iterations = 20
-    
+
 
     @staticmethod
     def print_info():

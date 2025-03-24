@@ -7,7 +7,7 @@ from dynamics import Dynamics
 from config import SimulationConfig as CFG
 
 
-class CentralizedNewton:
+class GaussNewton:
     def __init__(self, H, K, o, R, grad_norm_order_mag, grad_norm_tol, max_iterations):   
         # Simulation parameters
         self.H = H
@@ -95,17 +95,11 @@ class CentralizedNewton:
             raise ValueError("k is out of bounds")
         R_inv = np.linalg.inv(self.R)
         STM = np.eye(CFG.n)
-        DSTM = np.zeros((CFG.n * CFG.n, CFG.n))
         HJ_x = np.zeros((CFG.n, CFG.n))
         for tau in range(k - self.H + 1, k + 1):
-            y = Y[:, :, tau]
-            h_x = self.h(x_vec)
             Dh_x = self.Dh(x_vec)
-            Hh_x = self.Hh(x_vec)
             Df_x = STM
-            Hf_x = DSTM
-            HJ_x += - (np.kron(R_inv @ (y - h_x), Df_x).T @ Hh_x @ Df_x + np.kron(Dh_x.T @ R_inv @ (y - h_x), np.eye(CFG.n)).T @ Hf_x) + Df_x.T @ Dh_x.T @ R_inv @ Dh_x @ Df_x
-            DSTM = np.kron(np.eye(CFG.n), STM).T @ self.dyn.Hf(dt, x_vec) @ STM + np.kron(self.dyn.Df(dt, x_vec), np.eye(CFG.n)) @ DSTM
+            HJ_x += Df_x.T @ Dh_x.T @ R_inv @ Dh_x @ Df_x
             STM = self.dyn.Df(dt, x_vec) @ STM
             x_vec = self.dyn.f(dt, x_vec)
         return HJ_x
@@ -168,16 +162,16 @@ class CentralizedNewton:
                 reason = "tolerance reached" if gradient_norm_value < self.grad_norm_tol else \
                         "max iteration reached" if iteration == self.max_iterations else \
                         "gradient norm stagnated"
-                print(f"[Centralized Newton] STOP on Iteration {iteration} ({reason})")
+                print(f"[Gauss-Newton] STOP on Iteration {iteration} ({reason})")
                 print(f"Cost function = {cost_value} ({cost_value_change:.2f}%)\nGradient norm = {gradient_norm_value} ({gradient_norm_value_change:.2f}%)\nGlobal estimation error = {np.linalg.norm(x - x_true_initial)} ({global_estimation_error_change:.2f}%)")
                 print(f"Final initial conditions estimation errors: {np.linalg.norm(x[:CFG.n_p, :] - x_true_initial[:CFG.n_p, :])} m, {np.linalg.norm(x[CFG.n_x : CFG.n_x + CFG.n_p, :] - x_true_initial[CFG.n_x : CFG.n_x + CFG.n_p, :])} m, {np.linalg.norm(x[2 * CFG.n_x : 2 * CFG.n_x + CFG.n_p, :] - x_true_initial[2 * CFG.n_x : 2 * CFG.n_x + CFG.n_p, :])} m, {np.linalg.norm(x[3 * CFG.n_x : 3 * CFG.n_x + CFG.n_p, :] - x_true_initial[3 * CFG.n_x : 3 * CFG.n_x + CFG.n_p, :])} m")
                 print(f"Final position estimation errors: {np.linalg.norm(x_end[:CFG.n_p, :] - x_true_end[:CFG.n_p, :])} m, {np.linalg.norm(x_end[CFG.n_x : CFG.n_x + CFG.n_p, :] - x_true_end[CFG.n_x : CFG.n_x + CFG.n_p, :])} m, {np.linalg.norm(x_end[2 * CFG.n_x : 2 * CFG.n_x + CFG.n_p, :] - x_true_end[2 * CFG.n_x : 2 * CFG.n_x + CFG.n_p, :])} m, {np.linalg.norm(x_end[3 * CFG.n_x : 3 * CFG.n_x + CFG.n_p, :] - x_true_end[3 * CFG.n_x : 3 * CFG.n_x + CFG.n_p, :])} m\n")
                 break
             else:
                 if iteration == 0:
-                    print(f"[Centralized Newton] Before applying the algorithm\nCost function: {cost_value}\nGradient norm: {gradient_norm_value}\nGlobal estimation error: {np.linalg.norm(x - x_true_initial)}")
+                    print(f"[Gauss-Newton] Before applying the algorithm\nCost function: {cost_value}\nGradient norm: {gradient_norm_value}\nGlobal estimation error: {np.linalg.norm(x - x_true_initial)}")
                 else:
-                    print(f"[Centralized Newton] Iteration {iteration}\nCost function: {cost_value} ({cost_value_change:.2f}%)\nGradient norm: {gradient_norm_value} ({gradient_norm_value_change:.2f}%)\nGlobal estimation error: {np.linalg.norm(x - x_true_initial)} ({global_estimation_error_change:.2f}%)")
+                    print(f"[Gauss-Newton] Iteration {iteration}\nCost function: {cost_value} ({cost_value_change:.2f}%)\nGradient norm: {gradient_norm_value} ({gradient_norm_value_change:.2f}%)\nGlobal estimation error: {np.linalg.norm(x - x_true_initial)} ({global_estimation_error_change:.2f}%)")
                     
             # Print estimation errors 
             print(f"Initial conditions estimation errors: {np.linalg.norm(x[:CFG.n_p, :] - x_true_initial[:CFG.n_p, :])} m, {np.linalg.norm(x[CFG.n_x : CFG.n_x + CFG.n_p, :] - x_true_initial[CFG.n_x : CFG.n_x + CFG.n_p, :])} m, {np.linalg.norm(x[2 * CFG.n_x : 2 * CFG.n_x + CFG.n_p, :] - x_true_initial[2 * CFG.n_x : 2 * CFG.n_x + CFG.n_p, :])} m, {np.linalg.norm(x[3 * CFG.n_x : 3 * CFG.n_x + CFG.n_p, :] - x_true_initial[3 * CFG.n_x : 3 * CFG.n_x + CFG.n_p, :])} m")

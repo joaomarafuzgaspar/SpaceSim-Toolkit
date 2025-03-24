@@ -1,13 +1,12 @@
 import numpy as np
 
-from tqdm import tqdm
 from scipy.linalg import solve
 
 from dynamics import Dynamics
 from config import SimulationConfig as CFG
 
 
-class CentralizedNewton:
+class ApproxHNewton:
     def __init__(self, H, K, o, R, grad_norm_order_mag, grad_norm_tol, max_iterations):   
         # Simulation parameters
         self.H = H
@@ -59,8 +58,9 @@ class CentralizedNewton:
             hess_d = hessian_distance(d, norm_d)
             
             second_order_der[k, i * CFG.n_x : i * CFG.n_x + CFG.n_p, i * CFG.n_x : i * CFG.n_x + CFG.n_p] = -hess_d
-            second_order_der[k, i * CFG.n_x : i * CFG.n_x + CFG.n_p, j * CFG.n_x : j * CFG.n_x + CFG.n_p] = hess_d
-            second_order_der[k, j * CFG.n_x : j * CFG.n_x + CFG.n_p, i * CFG.n_x : i * CFG.n_x + CFG.n_p] = hess_d
+            if (i, j) in {(1, 0), (2, 0), (3, 0)}:
+                second_order_der[k, i * CFG.n_x : i * CFG.n_x + CFG.n_p, j * CFG.n_x : j * CFG.n_x + CFG.n_p] = hess_d
+                second_order_der[k, j * CFG.n_x : j * CFG.n_x + CFG.n_p, i * CFG.n_x : i * CFG.n_x + CFG.n_p] = hess_d
             second_order_der[k, j * CFG.n_x : j * CFG.n_x + CFG.n_p, j * CFG.n_x : j * CFG.n_x + CFG.n_p] = -hess_d
         
         return second_order_der.reshape((self.o * CFG.n, CFG.n))
@@ -168,16 +168,16 @@ class CentralizedNewton:
                 reason = "tolerance reached" if gradient_norm_value < self.grad_norm_tol else \
                         "max iteration reached" if iteration == self.max_iterations else \
                         "gradient norm stagnated"
-                print(f"[Centralized Newton] STOP on Iteration {iteration} ({reason})")
+                print(f"[ApproxH Newton] STOP on Iteration {iteration} ({reason})")
                 print(f"Cost function = {cost_value} ({cost_value_change:.2f}%)\nGradient norm = {gradient_norm_value} ({gradient_norm_value_change:.2f}%)\nGlobal estimation error = {np.linalg.norm(x - x_true_initial)} ({global_estimation_error_change:.2f}%)")
                 print(f"Final initial conditions estimation errors: {np.linalg.norm(x[:CFG.n_p, :] - x_true_initial[:CFG.n_p, :])} m, {np.linalg.norm(x[CFG.n_x : CFG.n_x + CFG.n_p, :] - x_true_initial[CFG.n_x : CFG.n_x + CFG.n_p, :])} m, {np.linalg.norm(x[2 * CFG.n_x : 2 * CFG.n_x + CFG.n_p, :] - x_true_initial[2 * CFG.n_x : 2 * CFG.n_x + CFG.n_p, :])} m, {np.linalg.norm(x[3 * CFG.n_x : 3 * CFG.n_x + CFG.n_p, :] - x_true_initial[3 * CFG.n_x : 3 * CFG.n_x + CFG.n_p, :])} m")
                 print(f"Final position estimation errors: {np.linalg.norm(x_end[:CFG.n_p, :] - x_true_end[:CFG.n_p, :])} m, {np.linalg.norm(x_end[CFG.n_x : CFG.n_x + CFG.n_p, :] - x_true_end[CFG.n_x : CFG.n_x + CFG.n_p, :])} m, {np.linalg.norm(x_end[2 * CFG.n_x : 2 * CFG.n_x + CFG.n_p, :] - x_true_end[2 * CFG.n_x : 2 * CFG.n_x + CFG.n_p, :])} m, {np.linalg.norm(x_end[3 * CFG.n_x : 3 * CFG.n_x + CFG.n_p, :] - x_true_end[3 * CFG.n_x : 3 * CFG.n_x + CFG.n_p, :])} m\n")
                 break
             else:
                 if iteration == 0:
-                    print(f"[Centralized Newton] Before applying the algorithm\nCost function: {cost_value}\nGradient norm: {gradient_norm_value}\nGlobal estimation error: {np.linalg.norm(x - x_true_initial)}")
+                    print(f"[ApproxH Newton] Before applying the algorithm\nCost function: {cost_value}\nGradient norm: {gradient_norm_value}\nGlobal estimation error: {np.linalg.norm(x - x_true_initial)}")
                 else:
-                    print(f"[Centralized Newton] Iteration {iteration}\nCost function: {cost_value} ({cost_value_change:.2f}%)\nGradient norm: {gradient_norm_value} ({gradient_norm_value_change:.2f}%)\nGlobal estimation error: {np.linalg.norm(x - x_true_initial)} ({global_estimation_error_change:.2f}%)")
+                    print(f"[ApproxH Newton] Iteration {iteration}\nCost function: {cost_value} ({cost_value_change:.2f}%)\nGradient norm: {gradient_norm_value} ({gradient_norm_value_change:.2f}%)\nGlobal estimation error: {np.linalg.norm(x - x_true_initial)} ({global_estimation_error_change:.2f}%)")
                     
             # Print estimation errors 
             print(f"Initial conditions estimation errors: {np.linalg.norm(x[:CFG.n_p, :] - x_true_initial[:CFG.n_p, :])} m, {np.linalg.norm(x[CFG.n_x : CFG.n_x + CFG.n_p, :] - x_true_initial[CFG.n_x : CFG.n_x + CFG.n_p, :])} m, {np.linalg.norm(x[2 * CFG.n_x : 2 * CFG.n_x + CFG.n_p, :] - x_true_initial[2 * CFG.n_x : 2 * CFG.n_x + CFG.n_p, :])} m, {np.linalg.norm(x[3 * CFG.n_x : 3 * CFG.n_x + CFG.n_p, :] - x_true_initial[3 * CFG.n_x : 3 * CFG.n_x + CFG.n_p, :])} m")
