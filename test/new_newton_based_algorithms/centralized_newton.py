@@ -110,7 +110,7 @@ class CentralizedNewton:
             x_vec = self.dyn.f(dt, x_vec)
         return HJ_x
 
-    def solve(self, k, dt, Y, x_init, x_true_initial, x_true_end):
+    def solve_MHE_problem(self, k, dt, Y, x_init, x_true_initial, x_true_end):
         x = x_init.copy()
 
         prev_cost_value = None
@@ -171,7 +171,7 @@ class CentralizedNewton:
                 print(f"STOP on Iteration {iteration} ({reason})")
                 print(f"Cost function = {cost_value} ({cost_value_change:.2f}%)\nGradient norm = {gradient_norm_value} ({gradient_norm_value_change:.2f}%)\nGlobal estimation error = {np.linalg.norm(x - x_true_initial)} ({global_estimation_error_change:.2f}%)")
                 print(f"Final initial conditions estimation errors: {np.linalg.norm(x[:CFG.n_p, :] - x_true_initial[:CFG.n_p, :])} m, {np.linalg.norm(x[CFG.n_x : CFG.n_x + CFG.n_p, :] - x_true_initial[CFG.n_x : CFG.n_x + CFG.n_p, :])} m, {np.linalg.norm(x[2 * CFG.n_x : 2 * CFG.n_x + CFG.n_p, :] - x_true_initial[2 * CFG.n_x : 2 * CFG.n_x + CFG.n_p, :])} m, {np.linalg.norm(x[3 * CFG.n_x : 3 * CFG.n_x + CFG.n_p, :] - x_true_initial[3 * CFG.n_x : 3 * CFG.n_x + CFG.n_p, :])} m")
-                print(f"Final position estimation errors: {np.linalg.norm(x_end[:CFG.n_p, :] - x_true_end[:CFG.n_p, :])} m, {np.linalg.norm(x_end[CFG.n_x : CFG.n_x + CFG.n_p, :] - x_true_end[CFG.n_x : CFG.n_x + CFG.n_p, :])} m, {np.linalg.norm(x_end[2 * CFG.n_x : 2 * CFG.n_x + CFG.n_p, :] - x_true_end[2 * CFG.n_x : 2 * CFG.n_x + CFG.n_p, :])} m, {np.linalg.norm(x_end[3 * CFG.n_x : 3 * CFG.n_x + CFG.n_p, :] - x_true_end[3 * CFG.n_x : 3 * CFG.n_x + CFG.n_p, :])} m\CFG.n")
+                print(f"Final position estimation errors: {np.linalg.norm(x_end[:CFG.n_p, :] - x_true_end[:CFG.n_p, :])} m, {np.linalg.norm(x_end[CFG.n_x : CFG.n_x + CFG.n_p, :] - x_true_end[CFG.n_x : CFG.n_x + CFG.n_p, :])} m, {np.linalg.norm(x_end[2 * CFG.n_x : 2 * CFG.n_x + CFG.n_p, :] - x_true_end[2 * CFG.n_x : 2 * CFG.n_x + CFG.n_p, :])} m, {np.linalg.norm(x_end[3 * CFG.n_x : 3 * CFG.n_x + CFG.n_p, :] - x_true_end[3 * CFG.n_x : 3 * CFG.n_x + CFG.n_p, :])} m\n")
                 break
             else:
                 if iteration == 0:
@@ -181,7 +181,7 @@ class CentralizedNewton:
                     
             # Print estimation errors 
             print(f"Initial conditions estimation errors: {np.linalg.norm(x[:CFG.n_p, :] - x_true_initial[:CFG.n_p, :])} m, {np.linalg.norm(x[CFG.n_x : CFG.n_x + CFG.n_p, :] - x_true_initial[CFG.n_x : CFG.n_x + CFG.n_p, :])} m, {np.linalg.norm(x[2 * CFG.n_x : 2 * CFG.n_x + CFG.n_p, :] - x_true_initial[2 * CFG.n_x : 2 * CFG.n_x + CFG.n_p, :])} m, {np.linalg.norm(x[3 * CFG.n_x : 3 * CFG.n_x + CFG.n_p, :] - x_true_initial[3 * CFG.n_x : 3 * CFG.n_x + CFG.n_p, :])} m")
-            print(f"Position estimation errors: {np.linalg.norm(x_end[:CFG.n_p, :] - x_true_end[:CFG.n_p, :])} m, {np.linalg.norm(x_end[CFG.n_x : CFG.n_x + CFG.n_p, :] - x_true_end[CFG.n_x : CFG.n_x + CFG.n_p, :])} m, {np.linalg.norm(x_end[2 * CFG.n_x : 2 * CFG.n_x + CFG.n_p, :] - x_true_end[2 * CFG.n_x : 2 * CFG.n_x + CFG.n_p, :])} m, {np.linalg.norm(x_end[3 * CFG.n_x : 3 * CFG.n_x + CFG.n_p, :] - x_true_end[3 * CFG.n_x : 3 * CFG.n_x + CFG.n_p, :])} m\CFG.n")
+            print(f"Position estimation errors: {np.linalg.norm(x_end[:CFG.n_p, :] - x_true_end[:CFG.n_p, :])} m, {np.linalg.norm(x_end[CFG.n_x : CFG.n_x + CFG.n_p, :] - x_true_end[CFG.n_x : CFG.n_x + CFG.n_p, :])} m, {np.linalg.norm(x_end[2 * CFG.n_x : 2 * CFG.n_x + CFG.n_p, :] - x_true_end[2 * CFG.n_x : 2 * CFG.n_x + CFG.n_p, :])} m, {np.linalg.norm(x_end[3 * CFG.n_x : 3 * CFG.n_x + CFG.n_p, :] - x_true_end[3 * CFG.n_x : 3 * CFG.n_x + CFG.n_p, :])} m\n")
                 
             # Solve for the Newton step - this is one iteration
             delta_x = solve(HJ_x, -DJ_x)
