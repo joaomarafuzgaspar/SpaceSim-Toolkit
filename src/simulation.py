@@ -19,6 +19,7 @@ from utils import (
     save_propagation_data,
     get_form_initial_conditions,
 )
+from config import SimulationConfig as config
 
 
 def run_tudat_propagation(args):
@@ -79,12 +80,38 @@ def run_simulation(args):
     # )
     # Q_deputies = block_diag(Q_deputy, Q_deputy, Q_deputy)
     # Q = block_diag(Q_chief, Q_deputies)
-    Q = np.diag(np.array([3.60796950e-02, 1.42365453e-02, 3.83449571e-02, 3.97399276e-05,
-                          1.58022824e-05, 4.25669363e-05, 3.60560910e-02, 1.42280860e-02,
-                          3.83093158e-02, 3.97142063e-05, 1.57927751e-05, 4.25271118e-05,
-                          3.61160223e-02, 1.42399689e-02, 3.83823676e-02, 3.97796608e-05,
-                          1.58061474e-05, 4.26087619e-05, 3.60343293e-02, 1.42101192e-02,
-                          3.82896510e-02, 3.96901962e-05, 1.57729000e-05, 4.25046636e-05]))
+    Q = np.diag(
+        np.array(
+            [
+                3.60796950e-02,
+                1.42365453e-02,
+                3.83449571e-02,
+                3.97399276e-05,
+                1.58022824e-05,
+                4.25669363e-05,
+                3.60560910e-02,
+                1.42280860e-02,
+                3.83093158e-02,
+                3.97142063e-05,
+                1.57927751e-05,
+                4.25271118e-05,
+                3.61160223e-02,
+                1.42399689e-02,
+                3.83823676e-02,
+                3.97796608e-05,
+                1.58061474e-05,
+                4.26087619e-05,
+                3.60343293e-02,
+                1.42101192e-02,
+                3.82896510e-02,
+                3.96901962e-05,
+                1.57729000e-05,
+                4.25046636e-05,
+            ]
+        )
+    )
+    Q_chief = Q[:config.n_x, :config.n_x]
+    Q_deputies = Q[config.n_x:, config.n_x:]
 
     # Observation noise
     r_chief_pos = 1e-1  # [m]
@@ -670,12 +697,11 @@ def run_simulation(args):
         rmse_deputy1 = rmse(X_est_all[m][6:12, :, T_RMSE:], X_true[6:12, :, T_RMSE:])
         rmse_deputy2 = rmse(X_est_all[m][12:18, :, T_RMSE:], X_true[12:18, :, T_RMSE:])
         rmse_deputy3 = rmse(X_est_all[m][18:24, :, T_RMSE:], X_true[18:24, :, T_RMSE:])
-        invalid_rmse = 1e2
         if (
-            rmse_chief < invalid_rmse
-            and rmse_deputy1 < invalid_rmse
-            and rmse_deputy2 < invalid_rmse
-            and rmse_deputy3 < invalid_rmse
+            rmse_chief < config.invalid_rmse
+            and rmse_deputy1 < config.invalid_rmse
+            and rmse_deputy2 < config.invalid_rmse
+            and rmse_deputy3 < config.invalid_rmse
         ):
             rmse_chief_values.append(rmse_chief)
             rmse_deputy1_values.append(rmse_deputy1)

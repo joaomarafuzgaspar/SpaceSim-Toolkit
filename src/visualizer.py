@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 from utils import rmse
 from matlab import engine
 from datetime import datetime
+from config import SimulationConfig as config
 
 
 plt.rcParams.update(
@@ -71,12 +72,11 @@ def metrics(T_RMSE, data):
         rmse_deputy3 = rmse(X_est[18:24, :, T_RMSE:], X_true[18:24, :, T_RMSE:])
 
         # Only keep the valid values
-        invalid_rmse = 1e2
         if (
-            rmse_chief < invalid_rmse
-            and rmse_deputy1 < invalid_rmse
-            and rmse_deputy2 < invalid_rmse
-            and rmse_deputy3 < invalid_rmse
+            rmse_chief < config.invalid_rmse
+            and rmse_deputy1 < config.invalid_rmse
+            and rmse_deputy2 < config.invalid_rmse
+            and rmse_deputy3 < config.invalid_rmse
         ):
             dev_chief_values.append(dev_chief)
             dev_deputy1_values.append(dev_deputy1)
