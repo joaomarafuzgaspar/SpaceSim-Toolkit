@@ -12,7 +12,7 @@ class SimulationConfig:
     n = N * n_x
     o = 3 + 3 + 2 + 1 
     H = 15 # Window size [min]
-    invalid_rmse = 1e20 # [m]
+    invalid_rmse = 1e2 # [m]
     
     # Spacecraft parameters
     C_drag = 2.22  # Drag coefficient
@@ -23,8 +23,3 @@ class SimulationConfig:
     grad_norm_order_mag = True
     grad_norm_tol = 1e-6
     max_iterations = 20
-
-
-    @staticmethod
-    def print_info():
-        print(f"Duration: {SimulationConfig.DURATION}, dt: {SimulationConfig.TIME_STEP}")

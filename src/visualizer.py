@@ -222,8 +222,6 @@ def visualizer_all_devs(args):
     data_filepath_fcekf = get_latest_file(prefix=f"fcekf_form{args.formation}_")
     data_filepath_hcmci = get_latest_file(prefix=f"hcmci_form{args.formation}_")
     data_filepath_ccekf = get_latest_file(prefix=f"ccekf_form{args.formation}_")
-    data_filepath_cnkkt = get_latest_file(prefix=f"cnkkt_form{args.formation}_")
-    data_filepath_unkkt = get_latest_file(prefix=f"unkkt_form{args.formation}_")
     with open(data_filepath_wlstsq_lm, "rb") as f:
         data_wlstsq_lm = pickle.load(f)
     with open(data_filepath_fcekf, "rb") as f:
@@ -232,12 +230,8 @@ def visualizer_all_devs(args):
         data_hcmci = pickle.load(f)
     with open(data_filepath_ccekf, "rb") as f:
         data_ccekf = pickle.load(f)
-    with open(data_filepath_cnkkt, "rb") as f:
-        data_cnkkt = pickle.load(f)
-    with open(data_filepath_unkkt, "rb") as f:
-        data_unkkt = pickle.load(f)
     print(
-        f'Plotting data from "path" (Monte Carlo runs): "{data_filepath_wlstsq_lm}" ({len(data_wlstsq_lm) - 1}), "{data_filepath_fcekf}" ({len(data_fcekf) - 1}), "{data_filepath_hcmci}" ({len(data_hcmci) - 1}), "{data_filepath_ccekf}" ({len(data_ccekf) - 1}), "{data_filepath_cnkkt}" ({len(data_cnkkt) - 1}), "{data_filepath_unkkt}" ({len(data_unkkt) - 1})...'
+        f'Plotting data from "path" (Monte Carlo runs): "{data_filepath_wlstsq_lm}" ({len(data_wlstsq_lm) - 1}), "{data_filepath_fcekf}" ({len(data_fcekf) - 1}), "{data_filepath_hcmci}" ({len(data_hcmci) - 1}), "{data_filepath_ccekf}" ({len(data_ccekf) - 1})...'
     )
 
     # Simulation parameters
@@ -262,12 +256,6 @@ def visualizer_all_devs(args):
     dev_chief_ccekf, dev_deputy1_ccekf, dev_deputy2_ccekf, dev_deputy3_ccekf = metrics(
         T_RMSE, data_ccekf
     )
-    dev_chief_cnkkt, dev_deputy1_cnkkt, dev_deputy2_cnkkt, dev_deputy3_cnkkt = metrics(
-        0, data_cnkkt
-    )
-    dev_chief_unkkt, dev_deputy1_unkkt, dev_deputy2_unkkt, dev_deputy3_unkkt = metrics(
-        0, data_unkkt
-    )
 
     # Plot positions based on screen size
     fig_width = 2 * 6.4  # in inches
@@ -281,8 +269,6 @@ def visualizer_all_devs(args):
     axs[0, 0].plot(time, dev_chief_fcekf, ".-", label="FCEKF")
     axs[0, 0].plot(time, dev_chief_hcmci, ".-", label="HCMCI")
     axs[0, 0].plot(time, dev_chief_ccekf, ".-", label="CCEKF")
-    axs[0, 0].plot(time[:len(dev_chief_cnkkt)], dev_chief_cnkkt, ".-", label="$\mathrm{cNKKT}_W$")
-    axs[0, 0].plot(time[:len(dev_chief_unkkt)], dev_chief_unkkt, ".-", label="$\mathrm{uNKKT}_W$")
     axs[0, 0].grid(which="major", color="#DDDDDD", zorder=1)
     axs[0, 0].grid(which="minor", color="#DDDDDD", linestyle=(0, (1, 3)), zorder=2)
     axs[0, 0].grid(True, which="both")
@@ -302,8 +288,6 @@ def visualizer_all_devs(args):
     axs[0, 1].plot(time, dev_deputy1_fcekf, ".-", label="FCEKF")
     axs[0, 1].plot(time, dev_deputy1_hcmci, ".-", label="HCMCI")
     axs[0, 1].plot(time, dev_deputy1_ccekf, ".-", label="CCEKF")
-    axs[0, 1].plot(time[:len(dev_deputy1_cnkkt)], dev_deputy1_cnkkt, ".-", label="$\mathrm{cNKKT}_W$")
-    axs[0, 1].plot(time[:len(dev_deputy1_unkkt)], dev_deputy1_unkkt, ".-", label="$\mathrm{uNKKT}_W$")
     axs[0, 1].grid(which="major", color="#DDDDDD", zorder=1)
     axs[0, 1].grid(which="minor", color="#DDDDDD", linestyle=(0, (1, 3)), zorder=2)
     axs[0, 1].grid(True, which="both")
@@ -323,8 +307,6 @@ def visualizer_all_devs(args):
     axs[1, 0].plot(time, dev_deputy2_fcekf, ".-", label="FCEKF")
     axs[1, 0].plot(time, dev_deputy2_hcmci, ".-", label="HCMCI")
     axs[1, 0].plot(time, dev_deputy2_ccekf, ".-", label="CCEKF")
-    axs[1, 0].plot(time[:len(dev_deputy2_cnkkt)], dev_deputy2_cnkkt, ".-", label="$\mathrm{cNKKT}_W$")
-    axs[1, 0].plot(time[:len(dev_deputy2_unkkt)], dev_deputy2_unkkt, ".-", label="$\mathrm{uNKKT}_W$")
     axs[1, 0].grid(which="major", color="#DDDDDD", zorder=1)
     axs[1, 0].grid(which="minor", color="#DDDDDD", linestyle=(0, (1, 3)), zorder=2)
     axs[1, 0].grid(True, which="both")
@@ -344,8 +326,6 @@ def visualizer_all_devs(args):
     axs[1, 1].plot(time, dev_deputy3_fcekf, ".-", label="FCEKF")
     axs[1, 1].plot(time, dev_deputy3_hcmci, ".-", label="HCMCI")
     axs[1, 1].plot(time, dev_deputy3_ccekf, ".-", label="CCEKF")
-    axs[1, 1].plot(time[:len(dev_deputy3_cnkkt)], dev_deputy3_cnkkt, ".-", label="$\mathrm{cNKKT}_W$")
-    axs[1, 1].plot(time[:len(dev_deputy3_unkkt)], dev_deputy3_unkkt, ".-", label="$\mathrm{uNKKT}_W$")
     axs[1, 1].grid(which="major", color="#DDDDDD", zorder=1)
     axs[1, 1].grid(which="minor", color="#DDDDDD", linestyle=(0, (1, 3)), zorder=2)
     axs[1, 1].grid(True, which="both")
