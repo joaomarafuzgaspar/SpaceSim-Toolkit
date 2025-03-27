@@ -12,7 +12,7 @@ from unkkt import UNKKT
 from approxh_newton import approxH_Newton
 from mm_newton import MM_Newton
 from scipy.linalg import block_diag
-from dynamics import SatelliteDynamics
+from dynamics import SatelliteDynamics, Dynamics
 from utils import (
     rmse,
     save_simulation_data,
@@ -56,62 +56,24 @@ def run_simulation(args):
     pi = 1 / N  # Consensus gain 2
     W = 100  # Window size
 
-    # Initial state vector and get the true state vectors (propagation) FIXME: Add run_propagation() here
+    # Initial state vector and get the true state vectors (propagation)
     X_initial = get_form_initial_conditions(args.formation)
-    # X_true = np.zeros((24, 1, T))
-    # X_true[:, :, 0] = X_initial
-    # for t in range(T - 1):
-    #     X_true[:, :, t + 1] = SatelliteDynamics().x_new(dt, X_true[:, :, t])
-    with open(f"data/tudatpy_form{args.formation}.pkl", "rb") as file:
+    with open(f"data/tudatpy_form{args.formation}_ts_{int(dt)}.pkl", "rb") as file:
         X_true = pickle.load(file)
 
     # Process noise
-    # q_chief_pos = 1e-1  # [m]
-    # q_chief_vel = 1e-2  # [m / s]
-    # Q_chief = (
-    #     np.diag(np.concatenate([q_chief_pos * np.ones(3), q_chief_vel * np.ones(3)]))
-    #     ** 2
-    # )
-    # q_deputy_pos = 1e0  # [m]
-    # q_deputy_vel = 1e-2  # [m / s]
-    # Q_deputy = (
-    #     np.diag(np.concatenate([q_deputy_pos * np.ones(3), q_deputy_vel * np.ones(3)]))
-    #     ** 2
-    # )
-    # Q_deputies = block_diag(Q_deputy, Q_deputy, Q_deputy)
-    # Q = block_diag(Q_chief, Q_deputies)
-    Q = np.diag(
-        np.array(
-            [
-                3.60796950e-02,
-                1.42365453e-02,
-                3.83449571e-02,
-                3.97399276e-05,
-                1.58022824e-05,
-                4.25669363e-05,
-                3.60560910e-02,
-                1.42280860e-02,
-                3.83093158e-02,
-                3.97142063e-05,
-                1.57927751e-05,
-                4.25271118e-05,
-                3.61160223e-02,
-                1.42399689e-02,
-                3.83823676e-02,
-                3.97796608e-05,
-                1.58061474e-05,
-                4.26087619e-05,
-                3.60343293e-02,
-                1.42101192e-02,
-                3.82896510e-02,
-                3.96901962e-05,
-                1.57729000e-05,
-                4.25046636e-05,
-            ]
-        )
-    )
+    dynamics_propagator = Dynamics()
+    X_dynamics_propagator = np.zeros((config.n, 1, config.K))
+    X_dynamics_propagator[:, :, 0] = X_initial
+    X_tudat_propagator = X_true.transpose(2, 0, 1).reshape(config.K, config.n)
+    for k, X_k in enumerate(X_tudat_propagator[:-1, :]):
+        X_dynamics_propagator[:, :, k + 1] = dynamics_propagator.f(dt, X_k.reshape(config.n, 1))
+    X_dynamics_propagator = X_dynamics_propagator.transpose(2, 0, 1).reshape(config.K, config.n)
+    diff = X_tudat_propagator - X_dynamics_propagator
+    Q = np.cov(diff.T)
     Q_chief = Q[:config.n_x, :config.n_x]
     Q_deputies = Q[config.n_x:, config.n_x:]
+    print("Computed process noise covariance matrix diagonal:\n", np.diag(Q))
 
     # Observation noise
     r_chief_pos = 1e-1  # [m]
