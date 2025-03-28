@@ -4,7 +4,7 @@ from tqdm import tqdm
 from scipy.linalg import solve
 
 from dynamics import Dynamics
-from config import SimulationConfig as CFG
+from config import SimulationConfig as config
 
 
 class CentralizedNewton:
@@ -30,43 +30,43 @@ class CentralizedNewton:
         self.A_norm_history, self.B_norm_history, self.C_norm_history = [], [], []
         
     def h(self, x_vec):
-        p_vecs = [x_vec[i : i + CFG.n_p] for i in range(0, CFG.n, CFG.n_x)]
+        p_vecs = [x_vec[i : i + config.n_p] for i in range(0, config.n, config.n_x)]
         distances = [np.linalg.norm(p_vecs[j] - p_vecs[i]) for (i, j) in [(1, 0), (1, 2), (1, 3), (2, 0), (2, 3), (3, 0)]]
         return np.concatenate((p_vecs[0], np.array(distances).reshape(-1, 1)))
 
     def Dh(self, x_vec):
-        first_order_der = np.zeros((self.o, CFG.n))
-        p_vecs = [x_vec[i : i + CFG.n_p] for i in range(0, CFG.n, CFG.n_x)]
+        first_order_der = np.zeros((self.o, config.n))
+        p_vecs = [x_vec[i : i + config.n_p] for i in range(0, config.n, config.n_x)]
         
-        first_order_der[:CFG.n_p, :CFG.n_p] = np.eye(CFG.n_p)
+        first_order_der[:config.n_p, :config.n_p] = np.eye(config.n_p)
         
-        for k, (i, j) in enumerate([(1, 0), (1, 2), (1, 3), (2, 0), (2, 3), (3, 0)], start=CFG.n_p):
+        for k, (i, j) in enumerate([(1, 0), (1, 2), (1, 3), (2, 0), (2, 3), (3, 0)], start=config.n_p):
             d = p_vecs[j] - p_vecs[i]
             norm_d = np.linalg.norm(d)
-            first_order_der[k, i * CFG.n_x : i * CFG.n_x + CFG.n_p] = -d.T / norm_d
-            first_order_der[k, j * CFG.n_x : j * CFG.n_x + CFG.n_p] = d.T / norm_d
+            first_order_der[k, i * config.n_x : i * config.n_x + config.n_p] = -d.T / norm_d
+            first_order_der[k, j * config.n_x : j * config.n_x + config.n_p] = d.T / norm_d
         
         return first_order_der
 
     def Hh(self, x_vec):
-        second_order_der = np.zeros((self.o, CFG.n, CFG.n))
-        p_vecs = [x_vec[i : i + CFG.n_p] for i in range(0, CFG.n, CFG.n_x)]
+        second_order_der = np.zeros((self.o, config.n, config.n))
+        p_vecs = [x_vec[i : i + config.n_p] for i in range(0, config.n, config.n_x)]
 
         def hessian_distance(d, norm_d):
-            I = np.eye(CFG.n_p)
+            I = np.eye(config.n_p)
             return -(I / norm_d - np.outer(d, d) / norm_d**3)
 
-        for k, (i, j) in enumerate([(1, 0), (1, 2), (1, 3), (2, 0), (2, 3), (3, 0)], start=CFG.n_p):
+        for k, (i, j) in enumerate([(1, 0), (1, 2), (1, 3), (2, 0), (2, 3), (3, 0)], start=config.n_p):
             d = p_vecs[j] - p_vecs[i]
             norm_d = np.linalg.norm(d)
             hess_d = hessian_distance(d, norm_d)
             
-            second_order_der[k, i * CFG.n_x : i * CFG.n_x + CFG.n_p, i * CFG.n_x : i * CFG.n_x + CFG.n_p] = -hess_d
-            second_order_der[k, i * CFG.n_x : i * CFG.n_x + CFG.n_p, j * CFG.n_x : j * CFG.n_x + CFG.n_p] = hess_d
-            second_order_der[k, j * CFG.n_x : j * CFG.n_x + CFG.n_p, i * CFG.n_x : i * CFG.n_x + CFG.n_p] = hess_d
-            second_order_der[k, j * CFG.n_x : j * CFG.n_x + CFG.n_p, j * CFG.n_x : j * CFG.n_x + CFG.n_p] = -hess_d
+            second_order_der[k, i * config.n_x : i * config.n_x + config.n_p, i * config.n_x : i * config.n_x + config.n_p] = -hess_d
+            second_order_der[k, i * config.n_x : i * config.n_x + config.n_p, j * config.n_x : j * config.n_x + config.n_p] = hess_d
+            second_order_der[k, j * config.n_x : j * config.n_x + config.n_p, i * config.n_x : i * config.n_x + config.n_p] = hess_d
+            second_order_der[k, j * config.n_x : j * config.n_x + config.n_p, j * config.n_x : j * config.n_x + config.n_p] = -hess_d
         
-        return second_order_der.reshape((self.o * CFG.n, CFG.n))
+        return second_order_der.reshape((self.o * config.n, config.n))
     
     def J(self, k, dt, Y, x_vec):
         if k < self.H - 1 or k + 1 > self.K:
@@ -81,11 +81,11 @@ class CentralizedNewton:
         return J_x
 
     def DJ(self, k, dt, Y, x_vec):
-        if k <self.H - 1 or k + 1 > self.K:
+        if k < self.H - 1 or k + 1 > self.K:
             raise ValueError("k is out of bounds")
         R_inv = np.linalg.inv(self.R)
-        STM = np.eye(CFG.n)
-        DJ_x = np.zeros((CFG.n, 1))
+        STM = np.eye(config.n)
+        DJ_x = np.zeros((config.n, 1))
         for tau in range(k - self.H + 1, k + 1):
             y = Y[:, :, tau]
             DJ_x += -STM.T @ self.Dh(x_vec).T @ R_inv @ (y - self.h(x_vec))
@@ -97,9 +97,9 @@ class CentralizedNewton:
         if k < self.H - 1 or k + 1 > self.K:
             raise ValueError("k is out of bounds")
         R_inv = np.linalg.inv(self.R)
-        STM = np.eye(CFG.n)
-        DSTM = np.zeros((CFG.n * CFG.n, CFG.n))
-        HJ_x = np.zeros((CFG.n, CFG.n))
+        STM = np.eye(config.n)
+        DSTM = np.zeros((config.n * config.n, config.n))
+        HJ_x = np.zeros((config.n, config.n))
         for tau in range(k - self.H + 1, k + 1):
             y = Y[:, :, tau]
             h_x = self.h(x_vec)
@@ -107,8 +107,8 @@ class CentralizedNewton:
             Hh_x = self.Hh(x_vec)
             Df_x = STM
             Hf_x = DSTM
-            HJ_x += - (np.kron(R_inv @ (y - h_x), Df_x).T @ Hh_x @ Df_x + np.kron(Dh_x.T @ R_inv @ (y - h_x), np.eye(CFG.n)).T @ Hf_x) + Df_x.T @ Dh_x.T @ R_inv @ Dh_x @ Df_x
-            DSTM = np.kron(np.eye(CFG.n), STM).T @ self.dyn.Hf(dt, x_vec) @ STM + np.kron(self.dyn.Df(dt, x_vec), np.eye(CFG.n)) @ DSTM
+            HJ_x += - (np.kron(R_inv @ (y - h_x), Df_x).T @ Hh_x @ Df_x + np.kron(Dh_x.T @ R_inv @ (y - h_x), np.eye(config.n)).T @ Hf_x) + Df_x.T @ Dh_x.T @ R_inv @ Dh_x @ Df_x
+            DSTM = np.kron(np.eye(config.n), STM).T @ self.dyn.Hf(dt, x_vec) @ STM + np.kron(self.dyn.Df(dt, x_vec), np.eye(config.n)) @ DSTM
             STM = self.dyn.Df(dt, x_vec) @ STM
             x_vec = self.dyn.f(dt, x_vec)
         return HJ_x
@@ -117,12 +117,12 @@ class CentralizedNewton:
         if k < self.H - 1 or k + 1 > self.K:
             raise ValueError("k is out of bounds")
         R_inv = np.linalg.inv(self.R)
-        STM = np.eye(CFG.n)
-        DSTM = np.zeros((CFG.n * CFG.n, CFG.n))
-        HJ_x = np.zeros((CFG.n, CFG.n))
-        A = np.zeros((CFG.n, CFG.n))
-        B = np.zeros((CFG.n, CFG.n))
-        C = np.zeros((CFG.n, CFG.n))
+        STM = np.eye(config.n)
+        DSTM = np.zeros((config.n * config.n, config.n))
+        HJ_x = np.zeros((config.n, config.n))
+        A = np.zeros((config.n, config.n))
+        B = np.zeros((config.n, config.n))
+        C = np.zeros((config.n, config.n))
         for tau in range(k - self.H + 1, k + 1):
             y = Y[:, :, tau]
             h_x = self.h(x_vec)
@@ -131,13 +131,13 @@ class CentralizedNewton:
             Df_x = STM
             Hf_x = DSTM
             A_aux = -np.kron(R_inv @ (y - h_x), Df_x).T @ Hh_x @ Df_x
-            B_aux = -np.kron(Dh_x.T @ R_inv @ (y - h_x), np.eye(CFG.n)).T @ Hf_x
+            B_aux = -np.kron(Dh_x.T @ R_inv @ (y - h_x), np.eye(config.n)).T @ Hf_x
             C_aux = Df_x.T @ Dh_x.T @ R_inv @ Dh_x @ Df_x
             A += A_aux
             B += B_aux
             C += C_aux
             HJ_x += A_aux + B_aux + C_aux
-            DSTM = np.kron(np.eye(CFG.n), STM).T @ self.dyn.Hf(dt, x_vec) @ STM + np.kron(self.dyn.Df(dt, x_vec), np.eye(CFG.n)) @ DSTM
+            DSTM = np.kron(np.eye(config.n), STM).T @ self.dyn.Hf(dt, x_vec) @ STM + np.kron(self.dyn.Df(dt, x_vec), np.eye(config.n)) @ DSTM
             STM = self.dyn.Df(dt, x_vec) @ STM
             x_vec = self.dyn.f(dt, x_vec)
         return HJ_x, np.linalg.eigvalsh(HJ_x), np.linalg.norm(A), np.linalg.norm(B), np.linalg.norm(C)
@@ -202,8 +202,8 @@ class CentralizedNewton:
                         "gradient norm stagnated"
                 print(f"[Centralized Newton] STOP on Iteration {iteration} ({reason})")
                 print(f"Cost function = {cost_value} ({cost_value_change:.2f}%)\nGradient norm = {gradient_norm_value} ({gradient_norm_value_change:.2f}%)\nGlobal estimation error = {np.linalg.norm(x - x_true_initial)} ({global_estimation_error_change:.2f}%)")
-                print(f"Final initial conditions estimation errors: {np.linalg.norm(x[:CFG.n_p, :] - x_true_initial[:CFG.n_p, :])} m, {np.linalg.norm(x[CFG.n_x : CFG.n_x + CFG.n_p, :] - x_true_initial[CFG.n_x : CFG.n_x + CFG.n_p, :])} m, {np.linalg.norm(x[2 * CFG.n_x : 2 * CFG.n_x + CFG.n_p, :] - x_true_initial[2 * CFG.n_x : 2 * CFG.n_x + CFG.n_p, :])} m, {np.linalg.norm(x[3 * CFG.n_x : 3 * CFG.n_x + CFG.n_p, :] - x_true_initial[3 * CFG.n_x : 3 * CFG.n_x + CFG.n_p, :])} m")
-                print(f"Final position estimation errors: {np.linalg.norm(x_end[:CFG.n_p, :] - x_true_end[:CFG.n_p, :])} m, {np.linalg.norm(x_end[CFG.n_x : CFG.n_x + CFG.n_p, :] - x_true_end[CFG.n_x : CFG.n_x + CFG.n_p, :])} m, {np.linalg.norm(x_end[2 * CFG.n_x : 2 * CFG.n_x + CFG.n_p, :] - x_true_end[2 * CFG.n_x : 2 * CFG.n_x + CFG.n_p, :])} m, {np.linalg.norm(x_end[3 * CFG.n_x : 3 * CFG.n_x + CFG.n_p, :] - x_true_end[3 * CFG.n_x : 3 * CFG.n_x + CFG.n_p, :])} m\n")
+                print(f"Final initial conditions estimation errors: {np.linalg.norm(x[:config.n_p, :] - x_true_initial[:config.n_p, :])} m, {np.linalg.norm(x[config.n_x : config.n_x + config.n_p, :] - x_true_initial[config.n_x : config.n_x + config.n_p, :])} m, {np.linalg.norm(x[2 * config.n_x : 2 * config.n_x + config.n_p, :] - x_true_initial[2 * config.n_x : 2 * config.n_x + config.n_p, :])} m, {np.linalg.norm(x[3 * config.n_x : 3 * config.n_x + config.n_p, :] - x_true_initial[3 * config.n_x : 3 * config.n_x + config.n_p, :])} m")
+                print(f"Final position estimation errors: {np.linalg.norm(x_end[:config.n_p, :] - x_true_end[:config.n_p, :])} m, {np.linalg.norm(x_end[config.n_x : config.n_x + config.n_p, :] - x_true_end[config.n_x : config.n_x + config.n_p, :])} m, {np.linalg.norm(x_end[2 * config.n_x : 2 * config.n_x + config.n_p, :] - x_true_end[2 * config.n_x : 2 * config.n_x + config.n_p, :])} m, {np.linalg.norm(x_end[3 * config.n_x : 3 * config.n_x + config.n_p, :] - x_true_end[3 * config.n_x : 3 * config.n_x + config.n_p, :])} m\n")
                 break
             else:
                 if iteration == 0:
@@ -212,8 +212,8 @@ class CentralizedNewton:
                     print(f"[Centralized Newton] Iteration {iteration}\nCost function: {cost_value} ({cost_value_change:.2f}%)\nGradient norm: {gradient_norm_value} ({gradient_norm_value_change:.2f}%)\nGlobal estimation error: {np.linalg.norm(x - x_true_initial)} ({global_estimation_error_change:.2f}%)")
                     
             # Print estimation errors 
-            print(f"Initial conditions estimation errors: {np.linalg.norm(x[:CFG.n_p, :] - x_true_initial[:CFG.n_p, :])} m, {np.linalg.norm(x[CFG.n_x : CFG.n_x + CFG.n_p, :] - x_true_initial[CFG.n_x : CFG.n_x + CFG.n_p, :])} m, {np.linalg.norm(x[2 * CFG.n_x : 2 * CFG.n_x + CFG.n_p, :] - x_true_initial[2 * CFG.n_x : 2 * CFG.n_x + CFG.n_p, :])} m, {np.linalg.norm(x[3 * CFG.n_x : 3 * CFG.n_x + CFG.n_p, :] - x_true_initial[3 * CFG.n_x : 3 * CFG.n_x + CFG.n_p, :])} m")
-            print(f"Position estimation errors: {np.linalg.norm(x_end[:CFG.n_p, :] - x_true_end[:CFG.n_p, :])} m, {np.linalg.norm(x_end[CFG.n_x : CFG.n_x + CFG.n_p, :] - x_true_end[CFG.n_x : CFG.n_x + CFG.n_p, :])} m, {np.linalg.norm(x_end[2 * CFG.n_x : 2 * CFG.n_x + CFG.n_p, :] - x_true_end[2 * CFG.n_x : 2 * CFG.n_x + CFG.n_p, :])} m, {np.linalg.norm(x_end[3 * CFG.n_x : 3 * CFG.n_x + CFG.n_p, :] - x_true_end[3 * CFG.n_x : 3 * CFG.n_x + CFG.n_p, :])} m\n")
+            print(f"Initial conditions estimation errors: {np.linalg.norm(x[:config.n_p, :] - x_true_initial[:config.n_p, :])} m, {np.linalg.norm(x[config.n_x : config.n_x + config.n_p, :] - x_true_initial[config.n_x : config.n_x + config.n_p, :])} m, {np.linalg.norm(x[2 * config.n_x : 2 * config.n_x + config.n_p, :] - x_true_initial[2 * config.n_x : 2 * config.n_x + config.n_p, :])} m, {np.linalg.norm(x[3 * config.n_x : 3 * config.n_x + config.n_p, :] - x_true_initial[3 * config.n_x : 3 * config.n_x + config.n_p, :])} m")
+            print(f"Position estimation errors: {np.linalg.norm(x_end[:config.n_p, :] - x_true_end[:config.n_p, :])} m, {np.linalg.norm(x_end[config.n_x : config.n_x + config.n_p, :] - x_true_end[config.n_x : config.n_x + config.n_p, :])} m, {np.linalg.norm(x_end[2 * config.n_x : 2 * config.n_x + config.n_p, :] - x_true_end[2 * config.n_x : 2 * config.n_x + config.n_p, :])} m, {np.linalg.norm(x_end[3 * config.n_x : 3 * config.n_x + config.n_p, :] - x_true_end[3 * config.n_x : 3 * config.n_x + config.n_p, :])} m\n")
                 
             # Solve for the Newton step - this is one iteration
             delta_x = solve(HJ_x, -DJ_x)
@@ -281,6 +281,18 @@ class CentralizedNewton:
             else:
                 stagnant_order = False
                 
+            # Distributed framework validation
+            T_matrix_x = np.zeros_like(HJ_x)
+            R_matrix_x = np.zeros_like(HJ_x)
+            for i in range(config.N):
+                for j in range(config.N):
+                    block = HJ_x[i*config.n_x:(i+1)*config.n_x, j*config.n_x:(j+1)*config.n_x]
+                    if i == j or i == 0 or j == 0:
+                        T_matrix_x[i*config.n_x:(i+1)*config.n_x, j*config.n_x:(j+1)*config.n_x] = block
+                    else:
+                        R_matrix_x[i*config.n_x:(i+1)*config.n_x, j*config.n_x:(j+1)*config.n_x] = -block
+            spectral_radius_T_inv_R = max(abs(np.linalg.eigvals(np.linalg.inv(T_matrix_x) @ R_matrix_x)))
+                
             # Propagate window initial conditions for metrics 
             x_end = x.copy()
             for _ in range(self.H - 1):
@@ -292,19 +304,19 @@ class CentralizedNewton:
                         "max iteration reached" if iteration == self.max_iterations else \
                         "gradient norm stagnated"
                 print(f"[Centralized Newton] STOP on Iteration {iteration} ({reason})")
-                print(f"Cost function = {cost_value} ({cost_value_change:.2f}%)\nGradient norm = {gradient_norm_value} ({gradient_norm_value_change:.2f}%)\nGlobal estimation error = {np.linalg.norm(x - x_true_initial)} ({global_estimation_error_change:.2f}%)\n{min(self.HJ_x_eigenvalues_history[-1])} {self.A_norm_history[-1] / self.C_norm_history[-1]} {self.B_norm_history[-1] / self.C_norm_history[-1]}")
-                print(f"Final initial conditions estimation errors: {np.linalg.norm(x[:CFG.n_p, :] - x_true_initial[:CFG.n_p, :])} m, {np.linalg.norm(x[CFG.n_x : CFG.n_x + CFG.n_p, :] - x_true_initial[CFG.n_x : CFG.n_x + CFG.n_p, :])} m, {np.linalg.norm(x[2 * CFG.n_x : 2 * CFG.n_x + CFG.n_p, :] - x_true_initial[2 * CFG.n_x : 2 * CFG.n_x + CFG.n_p, :])} m, {np.linalg.norm(x[3 * CFG.n_x : 3 * CFG.n_x + CFG.n_p, :] - x_true_initial[3 * CFG.n_x : 3 * CFG.n_x + CFG.n_p, :])} m")
-                print(f"Final position estimation errors: {np.linalg.norm(x_end[:CFG.n_p, :] - x_true_end[:CFG.n_p, :])} m, {np.linalg.norm(x_end[CFG.n_x : CFG.n_x + CFG.n_p, :] - x_true_end[CFG.n_x : CFG.n_x + CFG.n_p, :])} m, {np.linalg.norm(x_end[2 * CFG.n_x : 2 * CFG.n_x + CFG.n_p, :] - x_true_end[2 * CFG.n_x : 2 * CFG.n_x + CFG.n_p, :])} m, {np.linalg.norm(x_end[3 * CFG.n_x : 3 * CFG.n_x + CFG.n_p, :] - x_true_end[3 * CFG.n_x : 3 * CFG.n_x + CFG.n_p, :])} m\n")
+                print(f"Cost function = {cost_value} ({cost_value_change:.2f}%)\nGradient norm = {gradient_norm_value} ({gradient_norm_value_change:.2f}%)\nGlobal estimation error = {np.linalg.norm(x - x_true_initial)} ({global_estimation_error_change:.2f}%)\nHessian matrix minimum eigenvalue: {min(self.HJ_x_eigenvalues_history[-1])}\nRatios ||A|| / ||C||, ||B|| / ||C||: {self.A_norm_history[-1] / self.C_norm_history[-1]}, {self.B_norm_history[-1] / self.C_norm_history[-1]}\nSpectral radius inv(T) @ R: {spectral_radius_T_inv_R}\nT minimum eigenvalue: {min(np.linalg.eigvalsh(T_matrix_x))}")
+                print(f"Final initial conditions estimation errors: {np.linalg.norm(x[:config.n_p, :] - x_true_initial[:config.n_p, :])} m, {np.linalg.norm(x[config.n_x : config.n_x + config.n_p, :] - x_true_initial[config.n_x : config.n_x + config.n_p, :])} m, {np.linalg.norm(x[2 * config.n_x : 2 * config.n_x + config.n_p, :] - x_true_initial[2 * config.n_x : 2 * config.n_x + config.n_p, :])} m, {np.linalg.norm(x[3 * config.n_x : 3 * config.n_x + config.n_p, :] - x_true_initial[3 * config.n_x : 3 * config.n_x + config.n_p, :])} m")
+                print(f"Final position estimation errors: {np.linalg.norm(x_end[:config.n_p, :] - x_true_end[:config.n_p, :])} m, {np.linalg.norm(x_end[config.n_x : config.n_x + config.n_p, :] - x_true_end[config.n_x : config.n_x + config.n_p, :])} m, {np.linalg.norm(x_end[2 * config.n_x : 2 * config.n_x + config.n_p, :] - x_true_end[2 * config.n_x : 2 * config.n_x + config.n_p, :])} m, {np.linalg.norm(x_end[3 * config.n_x : 3 * config.n_x + config.n_p, :] - x_true_end[3 * config.n_x : 3 * config.n_x + config.n_p, :])} m\n")
                 break
             else:
                 if iteration == 0:
-                    print(f"[Centralized Newton] Before applying the algorithm\nCost function: {cost_value}\nGradient norm: {gradient_norm_value}\nGlobal estimation error: {np.linalg.norm(x - x_true_initial)}\n{min(self.HJ_x_eigenvalues_history[-1])} {self.A_norm_history[-1] / self.C_norm_history[-1]} {self.B_norm_history[-1] / self.C_norm_history[-1]}")
+                    print(f"[Centralized Newton] Before applying the algorithm\nCost function: {cost_value}\nGradient norm: {gradient_norm_value}\nGlobal estimation error: {np.linalg.norm(x - x_true_initial)}\nHessian matrix minimum eigenvalue: {min(self.HJ_x_eigenvalues_history[-1])}\nRatios ||A|| / ||C||, ||B|| / ||C||: {self.A_norm_history[-1] / self.C_norm_history[-1]}, {self.B_norm_history[-1] / self.C_norm_history[-1]}\nSpectral radius inv(T) @ R: {spectral_radius_T_inv_R}\nT minimum eigenvalue: {min(np.linalg.eigvalsh(T_matrix_x))}")
                 else:
-                    print(f"[Centralized Newton] Iteration {iteration}\nCost function: {cost_value} ({cost_value_change:.2f}%)\nGradient norm: {gradient_norm_value} ({gradient_norm_value_change:.2f}%)\nGlobal estimation error: {np.linalg.norm(x - x_true_initial)} ({global_estimation_error_change:.2f}%)\n{min(self.HJ_x_eigenvalues_history[-1])} {self.A_norm_history[-1] / self.C_norm_history[-1]} {self.B_norm_history[-1] / self.C_norm_history[-1]}")
+                    print(f"[Centralized Newton] Iteration {iteration}\nCost function: {cost_value} ({cost_value_change:.2f}%)\nGradient norm: {gradient_norm_value} ({gradient_norm_value_change:.2f}%)\nGlobal estimation error: {np.linalg.norm(x - x_true_initial)} ({global_estimation_error_change:.2f}%)\nHessian matrix minimum eigenvalue: {min(self.HJ_x_eigenvalues_history[-1])}\nRatios ||A|| / ||C||, ||B|| / ||C||: {self.A_norm_history[-1] / self.C_norm_history[-1]}, {self.B_norm_history[-1] / self.C_norm_history[-1]}\nSpectral radius inv(T) @ R: {spectral_radius_T_inv_R}\nT minimum eigenvalue: {min(np.linalg.eigvalsh(T_matrix_x))}")
                     
             # Print estimation errors 
-            print(f"Initial conditions estimation errors: {np.linalg.norm(x[:CFG.n_p, :] - x_true_initial[:CFG.n_p, :])} m, {np.linalg.norm(x[CFG.n_x : CFG.n_x + CFG.n_p, :] - x_true_initial[CFG.n_x : CFG.n_x + CFG.n_p, :])} m, {np.linalg.norm(x[2 * CFG.n_x : 2 * CFG.n_x + CFG.n_p, :] - x_true_initial[2 * CFG.n_x : 2 * CFG.n_x + CFG.n_p, :])} m, {np.linalg.norm(x[3 * CFG.n_x : 3 * CFG.n_x + CFG.n_p, :] - x_true_initial[3 * CFG.n_x : 3 * CFG.n_x + CFG.n_p, :])} m")
-            print(f"Position estimation errors: {np.linalg.norm(x_end[:CFG.n_p, :] - x_true_end[:CFG.n_p, :])} m, {np.linalg.norm(x_end[CFG.n_x : CFG.n_x + CFG.n_p, :] - x_true_end[CFG.n_x : CFG.n_x + CFG.n_p, :])} m, {np.linalg.norm(x_end[2 * CFG.n_x : 2 * CFG.n_x + CFG.n_p, :] - x_true_end[2 * CFG.n_x : 2 * CFG.n_x + CFG.n_p, :])} m, {np.linalg.norm(x_end[3 * CFG.n_x : 3 * CFG.n_x + CFG.n_p, :] - x_true_end[3 * CFG.n_x : 3 * CFG.n_x + CFG.n_p, :])} m\n")
+            print(f"Initial conditions estimation errors: {np.linalg.norm(x[:config.n_p, :] - x_true_initial[:config.n_p, :])} m, {np.linalg.norm(x[config.n_x : config.n_x + config.n_p, :] - x_true_initial[config.n_x : config.n_x + config.n_p, :])} m, {np.linalg.norm(x[2 * config.n_x : 2 * config.n_x + config.n_p, :] - x_true_initial[2 * config.n_x : 2 * config.n_x + config.n_p, :])} m, {np.linalg.norm(x[3 * config.n_x : 3 * config.n_x + config.n_p, :] - x_true_initial[3 * config.n_x : 3 * config.n_x + config.n_p, :])} m")
+            print(f"Position estimation errors: {np.linalg.norm(x_end[:config.n_p, :] - x_true_end[:config.n_p, :])} m, {np.linalg.norm(x_end[config.n_x : config.n_x + config.n_p, :] - x_true_end[config.n_x : config.n_x + config.n_p, :])} m, {np.linalg.norm(x_end[2 * config.n_x : 2 * config.n_x + config.n_p, :] - x_true_end[2 * config.n_x : 2 * config.n_x + config.n_p, :])} m, {np.linalg.norm(x_end[3 * config.n_x : 3 * config.n_x + config.n_p, :] - x_true_end[3 * config.n_x : 3 * config.n_x + config.n_p, :])} m\n")
                 
             # Solve for the Newton step - this is one iteration
             delta_x = solve(HJ_x, -DJ_x)
