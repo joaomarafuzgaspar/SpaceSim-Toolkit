@@ -160,8 +160,7 @@ def run_simulation(args):
                 X_est[:, :, t], P = fcekf.apply(dt, X_est[:, :, t - 1], P, Y[:, :, t])
             X_est_all.append(X_est)
     elif args.algorithm == "hcmci":
-        if args.formation == 1:
-            Q = block_diag(*[Q[i*6:(i+1)*6, i*6:(i+1)*6] for i in range(4)])
+        Q = block_diag(*[Q[i*6:(i+1)*6, i*6:(i+1)*6] for i in range(4)])
         fcekf = FCEKF(Q, R)
         chief_hcmci = HCMCI(np.linalg.inv(Q), np.linalg.inv(R))
         deputy1_hcmci = HCMCI(np.linalg.inv(Q), np.linalg.inv(R))
