@@ -176,7 +176,7 @@ class SatelliteDynamics:
         """
         Initialize satellite parameters.
         """
-        self.C_drag = 2.22  # Drag coefficient
+        self.C_drag = 2.2  # Drag coefficient
         self.A_drag = 0.01  # Drag area [m^2]
         self.m = 1.0  # Mass [kg]
 

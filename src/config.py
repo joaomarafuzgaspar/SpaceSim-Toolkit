@@ -15,7 +15,7 @@ class SimulationConfig:
     invalid_rmse = 1e2 # [m]
     
     # Spacecraft parameters
-    C_drag = 2.22  # Drag coefficient
+    C_drag = 2.2  # Drag coefficient
     A_drag = 0.01  # Drag area [m^2]
     m = 1.0  # Mass [kg]
     
