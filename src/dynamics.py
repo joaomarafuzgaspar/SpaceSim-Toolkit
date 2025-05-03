@@ -2,21 +2,22 @@ import numpy as np
 
 from earth import Earth, AtmosphericModel
 from config import SimulationConfig as config
+from config import SpacecraftConfig as generic_spacecraft
 
 # Load tudatpy modules
-# try:
-#     from tudatpy.interface import spice
-#     from tudatpy.util import result2array
-#     from tudatpy import numerical_simulation
-#     from tudatpy.numerical_simulation import (
-#         environment_setup,
-#         propagation_setup,
-#         estimation_setup,
-#     )
+try:
+    from tudatpy.interface import spice
+    from tudatpy.util import result2array
+    from tudatpy import numerical_simulation
+    from tudatpy.numerical_simulation import (
+        environment_setup,
+        propagation_setup,
+        estimation_setup,
+    )
 
-#     TUDATPY_AVAILABLE = True
-# except ModuleNotFoundError:
-#     TUDATPY_AVAILABLE = False
+    TUDATPY_AVAILABLE = True
+except ModuleNotFoundError:
+    TUDATPY_AVAILABLE = False
 
 
 def rotation_matrix_x(alpha):
@@ -164,6 +165,14 @@ def rv2coe(rv_geocentric_equatorial_vec):
             true_anomaly,
         ]
     )
+    
+    
+def rv2mean_argument_of_latitude(rv_geocentric_equatorial_vec):
+    _, eccentricity, _, argument_of_periapsis, _, true_anomaly = rv2coe(rv_geocentric_equatorial_vec)
+    eccentric_anomaly = 2 * np.arctan(np.sqrt((1 - eccentricity) / (1 + eccentricity)) * np.tan(true_anomaly / 2))
+    mean_anomaly = eccentric_anomaly - eccentricity * np.sin(eccentric_anomaly)
+    mean_argument_of_latitude = mean_anomaly + argument_of_periapsis
+    return mean_argument_of_latitude
 
 
 class SatelliteDynamics:
@@ -459,9 +468,6 @@ class Propagator:
         fixed_step_size,
         initial_conditions,
     ):
-        # Initialize spacecraft class
-        generic_spacecraft = SatelliteDynamics()
-
         # Load SPICE kernels
         spice.load_standard_kernels()
 
@@ -482,7 +488,7 @@ class Propagator:
         bodies = environment_setup.create_system_of_bodies(body_settings)
 
         # Add satellite bodies to the system and set their mass
-        mass = generic_spacecraft.m
+        mass = generic_spacecraft.mass
         spacecrafts = ["Chief", "Deputy1", "Deputy2", "Deputy3"]
         for spacecraft in spacecrafts:
             bodies.create_empty_body(spacecraft)
@@ -500,8 +506,8 @@ class Propagator:
             )
 
         # Define radiation pressure settings
-        reference_area_radiation = generic_spacecraft.A_drag
-        radiation_pressure_coefficient = 0
+        reference_area_radiation = generic_spacecraft.A_SRP
+        radiation_pressure_coefficient = generic_spacecraft.C_SRP
         occulting_bodies_dict = dict()
         occulting_bodies_dict["Sun"] = ["Earth"]
 

@@ -23,3 +23,11 @@ class SimulationConfig:
     grad_norm_order_mag = True
     grad_norm_tol = 1e-6
     max_iterations = 20
+
+
+class SpacecraftConfig:
+    mass = 1.0  # Mass [kg]
+    C_drag = 2.2  # Drag coefficient
+    A_drag = 0.01  # Drag area [m^2]
+    C_SRP = 1.2  # SRP coefficient
+    A_SRP = 0.01  # SRP area [m^2]
