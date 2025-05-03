@@ -46,7 +46,7 @@ def run_propagation(args):
 
 def run_simulation(args):
     # Simulation parameters
-    dt = 60.0  # Time step [s]
+    dt = 1.0  # Time step [s]
     T = 395  # Duration [min]
     T_RMSE = 300  # Index from which the RMSE is calculated
     M = args.monte_carlo_sims  # Number of Monte-Carlo simulations
@@ -73,7 +73,8 @@ def run_simulation(args):
     Q = np.cov(diff.T)
     Q_chief = Q[:config.n_x, :config.n_x]
     Q_deputies = Q[config.n_x:, config.n_x:]
-    print("Computed process noise covariance matrix diagonal:\n", np.diag(Q))
+    import pandas as pd
+    print("Computed process noise covariance matrix :\n", pd.DataFrame(Q), np.max(np.abs(Q)))
 
     # Observation noise
     r_chief_pos = 1e-1  # [m]
@@ -81,6 +82,7 @@ def run_simulation(args):
     r_deputy_pos = 1e0  # [m]
     R_deputies = np.diag(np.concatenate([r_deputy_pos * np.ones(6)])) ** 2
     R = block_diag(R_chief, R_deputies)
+    print("Observation noise covariance matrix :\n", pd.DataFrame(R))
 
     # Initial deviation noise
     p_pos_initial = 1e2  # [m]
