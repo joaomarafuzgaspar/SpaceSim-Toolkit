@@ -5,7 +5,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from utils import rmse
-from matlab import engine
+
+try:
+    from matlab import engine
+
+    MATLAB_AVAILABLE = True
+except ImportError:
+    MATLAB_AVAILABLE = False
 from datetime import datetime
 from config import SimulationConfig as config
 
@@ -234,7 +240,7 @@ def visualizer_all_devs(args):
     # Simulation parameters
     dt = 60.0  # Time step [s]
     T = np.shape(data_fcekf["true"])[2]  # Duration [min]
-    T_RMSE =  T - 95  # Duration for RMSE calculation [min]
+    T_RMSE = T - 95  # Duration for RMSE calculation [min]
     time = np.arange(0, T) / dt  # Time vector [h]
 
     # Get data to plot

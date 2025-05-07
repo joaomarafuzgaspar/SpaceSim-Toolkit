@@ -2,7 +2,6 @@ import numpy as np
 
 from earth import Earth, AtmosphericModel
 from config import SimulationConfig as config
-from config import SpacecraftConfig as generic_spacecraft
 
 # Load tudatpy modules
 try:
@@ -165,11 +164,15 @@ def rv2coe(rv_geocentric_equatorial_vec):
             true_anomaly,
         ]
     )
-    
-    
+
+
 def rv2mean_argument_of_latitude(rv_geocentric_equatorial_vec):
-    _, eccentricity, _, argument_of_periapsis, _, true_anomaly = rv2coe(rv_geocentric_equatorial_vec)
-    eccentric_anomaly = 2 * np.arctan(np.sqrt((1 - eccentricity) / (1 + eccentricity)) * np.tan(true_anomaly / 2))
+    _, eccentricity, _, argument_of_periapsis, _, true_anomaly = rv2coe(
+        rv_geocentric_equatorial_vec
+    )
+    eccentric_anomaly = 2 * np.arctan(
+        np.sqrt((1 - eccentricity) / (1 + eccentricity)) * np.tan(true_anomaly / 2)
+    )
     mean_anomaly = eccentric_anomaly - eccentricity * np.sin(eccentric_anomaly)
     mean_argument_of_latitude = mean_anomaly + argument_of_periapsis
     return mean_argument_of_latitude
@@ -488,15 +491,15 @@ class Propagator:
         bodies = environment_setup.create_system_of_bodies(body_settings)
 
         # Add satellite bodies to the system and set their mass
-        mass = generic_spacecraft.mass
+        mass = config.mass
         spacecrafts = ["Chief", "Deputy1", "Deputy2", "Deputy3"]
         for spacecraft in spacecrafts:
             bodies.create_empty_body(spacecraft)
             bodies.get(spacecraft).mass = mass
 
         # Add the aerodynamic interface to the environment
-        reference_area = generic_spacecraft.A_drag
-        drag_coefficient = generic_spacecraft.C_drag
+        reference_area = config.A_drag
+        drag_coefficient = config.C_drag
         aero_coefficient_settings = environment_setup.aerodynamic_coefficients.constant(
             reference_area, [drag_coefficient, 0.0, 0.0]
         )
@@ -506,8 +509,8 @@ class Propagator:
             )
 
         # Define radiation pressure settings
-        reference_area_radiation = generic_spacecraft.A_SRP
-        radiation_pressure_coefficient = generic_spacecraft.C_SRP
+        reference_area_radiation = config.A_SRP
+        radiation_pressure_coefficient = config.C_SRP
         occulting_bodies_dict = dict()
         occulting_bodies_dict["Sun"] = ["Earth"]
 
@@ -886,7 +889,7 @@ class Dynamics:
             / 2
             * config.C_drag
             * config.A_drag
-            / config.m
+            / config.mass
             * rho
             * v_rel_norm
             * v_vec_rel
@@ -917,7 +920,7 @@ class Dynamics:
             / 2
             * config.C_drag
             * config.A_drag
-            / config.m
+            / config.mass
             * (
                 rho
                 * (v_rel_norm * np.eye(3) + v_vec_rel * v_vec_rel.T / v_rel_norm)
@@ -947,7 +950,7 @@ class Dynamics:
             / 2
             * config.C_drag
             * config.A_drag
-            / config.m
+            / config.mass
             * rho
             * (v_rel_norm * np.eye(3) + v_vec_rel * v_vec_rel.T / v_rel_norm)
         )
@@ -1005,7 +1008,7 @@ class Dynamics:
         )
         term22 = np.kron(v_rel_norm * v_vec_rel, np.eye(3)) @ d2rho_dp_vec2
         term2 = term21 + term22
-        return -1 / 2 * config.C_drag * config.A_drag / config.m * (term1 + term2)
+        return -1 / 2 * config.C_drag * config.A_drag / config.mass * (term1 + term2)
 
     def d2a_drag_dv_vec_dp_vecT(self, x_vec):
         p_vec = x_vec[:3]
@@ -1047,7 +1050,7 @@ class Dynamics:
             ),
             drho_dp_vec.T,
         )
-        return -1 / 2 * config.C_drag * config.A_drag / config.m * (term1 + term2)
+        return -1 / 2 * config.C_drag * config.A_drag / config.mass * (term1 + term2)
 
     def d2a_drag_dp_vec_dv_vecT(self, x_vec):
         p_vec = x_vec[:3]
@@ -1086,7 +1089,7 @@ class Dynamics:
         term2 = np.kron(np.eye(3), drho_dp_vec) @ (
             v_rel_norm * np.eye(3) + v_vec_rel * v_vec_rel.T / v_rel_norm
         )
-        return -1 / 2 * config.C_drag * config.A_drag / config.m * (term1 + term2)
+        return -1 / 2 * config.C_drag * config.A_drag / config.mass * (term1 + term2)
 
     def d2a_drag_dv_vec_dv_vecT(self, x_vec):
         p_vec = x_vec[:3]
@@ -1109,7 +1112,7 @@ class Dynamics:
             / 2
             * config.C_drag
             * config.A_drag
-            / config.m
+            / config.mass
             * rho
             * (
                 1

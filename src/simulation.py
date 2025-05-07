@@ -516,25 +516,19 @@ def run_simulation(args):
                 np.random.seed(config.seed)
             
             # Generate observations
-            # Y = np.zeros((config.o, 1, config.K))
-            # for k in range(config.K):
-            #     Y[:, :, k] = newton.h(X_true[:, :, k]) + np.random.multivariate_normal(np.zeros(config.o), config.R).reshape((config.o, 1))
-            Y = np.zeros((config.o_tree, 1, config.K))
+            Y = np.zeros((config.o, 1, config.K))
             for k in range(config.K):
-                Y[:, :, k] = newton.h(X_true[:, :, k]) + np.random.multivariate_normal(np.zeros(config.o_tree), config.R_tree).reshape((config.o_tree, 1))
-
+                Y[:, :, k] = config.h(X_true[:, :, k]) + np.random.multivariate_normal(np.zeros(config.o), config.R).reshape((config.o, 1))
+            
             # Initial guess for the state vector
-            X_est = np.zeros_like(X_true)
-            # for k in range(config.H):
-            #     X_est[:, :, k] = None
+            X_est = np.full_like(X_true, np.nan)
             x_init = X_initial + np.random.multivariate_normal(np.zeros(config.n), config.P_0).reshape((config.n, 1))
             
             # Run the framework
             for k in tqdm(range(config.H - 1, config.K), desc="Windows", leave=False):
                 x_init, x_est_k = newton.solve_MHE_problem(k, Y, x_init, X_true[:, :, k - config.H + 1],  X_true[:, :, k])
                 X_est[:, :, k] = x_est_k
-                # Warm-start
-                x_init = dynamics_propagator.f(config.dt, x_init)
+                x_init = dynamics_propagator.f(config.dt, x_init)  # Warm-start for the next MHE problem
             X_est_all.append(X_est)
     elif args.algorithm == "cnkkt":
         fcekf = FCEKF(Q, config.R)
