@@ -47,8 +47,27 @@ def main():
         "-a",
         "--algorithm",
         type=str,
-        choices=["wlstsq-lm", "fcekf", "hcmci", "ccekf", "cnkkt", "unkkt", "approxh-newton", "mm-newton"],
-        help="Navigation algorithm to simulate (wlstsq-lm for WLSTSQ-LM, fcekf for FCEKF, hcmci for HCMCI, ccekf for CCEKF, cnkkt for CNKKT, unkkt for UNKKT, approxh-newton for approxH-Newton, or mm-newton for MM-Newton)",
+        choices=[
+            "lm",
+            "fcekf",
+            "hcmci",
+            "ccekf",
+            "newton",
+            "tree-newton",
+            "approxA-newton",
+            "mm-newton",
+            "inewton",
+        ],
+        help="""Orbit estimation algorithm framework:
+        lm: Levenberg-Marquardt applied to the weighted nonlinear least squares problem;
+        fcekf: fully centralized EKF;
+        hcmci: hybrid Consensus-based;
+        ccekf: Consider Covariance EKF;
+        newton: Newton's method for tree-structured output coupling topology;
+        tree-newton: Newton's method variant treeNewton for general output coupling topology;
+        approxA-newton: Newton's method variant approxANewton for general output coupling topology;
+        mm-newton: Newton's method variant MMNewton for general output coupling topology;
+        inewton: Newton's method variant iNewton for general output coupling topology""",
     )
     parser.add_argument(
         "-M",

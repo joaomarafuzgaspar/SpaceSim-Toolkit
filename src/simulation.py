@@ -1,18 +1,18 @@
 import pickle
 import numpy as np
+import pandas as pd
 
-# from numba import jit  # FIXME: speeding up the code
 from tqdm import tqdm
-from wlstsq_lm import WLSTSQ_LM
+from lm import LM
 from fcekf import FCEKF
 from hcmci import HCMCI
 from ccekf import EKF, CCEKF
+from newton import Newton
 from cnkkt import CNKKT
 from unkkt import UNKKT
 from approxh_newton import approxH_Newton
 from mm_newton import MM_Newton
-from scipy.linalg import block_diag
-from dynamics import SatelliteDynamics, Dynamics
+from dynamics import Dynamics
 from utils import (
     rmse,
     save_simulation_data,
@@ -27,76 +27,61 @@ def run_tudat_propagation(args):
 
 
 def run_propagation(args):
-    # Simulation parameters
-    dt = 60.0  # Time step [s]
-    T = 360  # Duration [min]
-
-    # Initial state vector
+    # Initial conditions
     X_initial = get_form_initial_conditions(args.formation)
 
-    # Get the true state vectors and Jacobians
-    X = np.zeros((24, 1, T))
+    # Propagation
+    dynamics_propagator = Dynamics()
+    X = np.zeros((config.n, 1, config.K))
     X[:, :, 0] = X_initial
-    for t in range(T - 1):
-        X[:, :, t + 1] = SatelliteDynamics().x_new(dt, X[:, :, t])
+    for k in range(config.K - 1):
+        X[:, :, k + 1] = dynamics_propagator.f(config.dt, X[:, :, k])
 
-    # Save data to pickle file
-    save_propagation_data(args, dt, T, X)
+    # Save propagation data to pickle file
+    save_propagation_data(args, config.dt, config.K, X)
 
 
 def run_simulation(args):
     # Simulation parameters
-    dt = 1.0  # Time step [s]
-    T = 395  # Duration [min]
-    T_RMSE = 300  # Index from which the RMSE is calculated
     M = args.monte_carlo_sims  # Number of Monte-Carlo simulations
-    L = 1  # Number of consensus iterations
-    N = 4  # Number of satellites
-    gamma = N  # Consensus gain 1
-    pi = 1 / N  # Consensus gain 2
-    W = 100  # Window size
 
-    # Initial state vector and get the true state vectors (propagation)
+    # Initial conditions and true state vectors (from Tudat)
     X_initial = get_form_initial_conditions(args.formation)
-    with open(f"data/tudatpy_form{args.formation}_ts_{int(dt)}.pkl", "rb") as file:
+    with open(
+        f"data/tudatpy_form{args.formation}_ts_{int(config.dt)}.pkl", "rb"
+    ) as file:
         X_true = pickle.load(file)
 
-    # Process noise
+    # Process noise covariance matrix estimation
     dynamics_propagator = Dynamics()
-    X_dynamics_propagator = np.zeros((config.n, 1, config.K))
-    X_dynamics_propagator[:, :, 0] = X_initial
-    X_tudat_propagator = X_true.transpose(2, 0, 1).reshape(config.K, config.n)
-    for k, X_k in enumerate(X_tudat_propagator[:-1, :]):
-        X_dynamics_propagator[:, :, k + 1] = dynamics_propagator.f(dt, X_k.reshape(config.n, 1))
-    X_dynamics_propagator = X_dynamics_propagator.transpose(2, 0, 1).reshape(config.K, config.n)
-    diff = X_tudat_propagator - X_dynamics_propagator
-    Q = np.cov(diff.T)
-    Q_chief = Q[:config.n_x, :config.n_x]
-    Q_deputies = Q[config.n_x:, config.n_x:]
-    import pandas as pd
-    print("Computed process noise covariance matrix :\n", pd.DataFrame(Q), np.max(np.abs(Q)))
-
-    # Observation noise
-    r_chief_pos = 1e-1  # [m]
-    R_chief = np.diag(np.concatenate([r_chief_pos * np.ones(3)])) ** 2
-    r_deputy_pos = 1e0  # [m]
-    R_deputies = np.diag(np.concatenate([r_deputy_pos * np.ones(6)])) ** 2
-    R = block_diag(R_chief, R_deputies)
-    print("Observation noise covariance matrix :\n", pd.DataFrame(R))
-
-    # Initial deviation noise
-    p_pos_initial = 1e2  # [m]
-    p_vel_initial = 1e-2  # [m / s]
+    if args.algorithm == "lm" or args.algorithm == "fcekf" or args.algorithm == "hcmci" or args.algorithm == "ccekf":
+        K_true = X_true.shape[2]
+        X_dynamics_propagator = np.zeros((config.n, 1, K_true))
+        X_dynamics_propagator[:, :, 0] = X_initial
+        X_tudat_propagator = X_true.transpose(2, 0, 1).reshape(K_true, config.n)
+        for k, X_k in enumerate(X_tudat_propagator[:-1, :]):
+            X_dynamics_propagator[:, :, k + 1] = dynamics_propagator.f(
+                config.dt, X_k.reshape(config.n, 1)
+            )
+        X_dynamics_propagator = X_dynamics_propagator.transpose(2, 0, 1).reshape(
+            K_true, config.n
+        )
+        diff = X_tudat_propagator - X_dynamics_propagator
+        Q = np.cov(diff.T)
+        print("Estimated process noise covariance matrix :\n", pd.DataFrame(Q))
+        Q_chief = Q[: config.n_x, : config.n_x]
+        Q_deputies = Q[config.n_x :, config.n_x :]
+    X_true = X_true[:, :, : config.K] # Truncate the true state vector to the simulation duration
 
     # Simulation
     X_est_all = []
-    if args.algorithm == "wlstsq-lm":
-        fcekf = FCEKF(Q, R)
-        wlstsq_lm = WLSTSQ_LM(Q, R)
+    if args.algorithm == "lm":
+        fcekf = FCEKF(Q, config.R)
+        lm = LM(Q, config.R)
         for m in tqdm(range(M)):
             # Observations
-            Y = np.zeros((9, 1, T))
-            for t in range(T):
+            Y = np.zeros((9, 1, config.K))
+            for t in range(config.K):
                 Y[:, :, t] = np.concatenate(
                     (
                         fcekf.h_function_chief(X_true[:, :, t]),
@@ -104,34 +89,34 @@ def run_simulation(args):
                     ),
                     axis=0,
                 ) + np.random.normal(
-                    0, np.sqrt(np.diag(R)).reshape((9, 1)), size=(9, 1)
+                    0, np.sqrt(np.diag(config.R)).reshape((9, 1)), size=(9, 1)
                 )
 
             # Initial state vector and state covariance estimate
             X_est = np.zeros_like(X_true)
             initial_dev = np.concatenate(
                 (
-                    p_pos_initial * np.random.randn(3, 1),
-                    p_vel_initial * np.random.randn(3, 1),
-                    p_pos_initial * np.random.randn(3, 1),
-                    p_vel_initial * np.random.randn(3, 1),
-                    p_pos_initial * np.random.randn(3, 1),
-                    p_vel_initial * np.random.randn(3, 1),
-                    p_pos_initial * np.random.randn(3, 1),
-                    p_vel_initial * np.random.randn(3, 1),
+                    config.p_pos_initial * np.random.randn(3, 1),
+                    config.p_vel_initial * np.random.randn(3, 1),
+                    config.p_pos_initial * np.random.randn(3, 1),
+                    config.p_vel_initial * np.random.randn(3, 1),
+                    config.p_pos_initial * np.random.randn(3, 1),
+                    config.p_vel_initial * np.random.randn(3, 1),
+                    config.p_pos_initial * np.random.randn(3, 1),
+                    config.p_vel_initial * np.random.randn(3, 1),
                 )
             )
             X_est[:, :, 0] = X_initial + initial_dev
-            for t in range(1, T):
-                X_est[:, :, t] = SatelliteDynamics().x_new(dt, X_est[:, :, t - 1])
-            X_est = wlstsq_lm.apply(dt, X_est, Y)
+            for t in range(1, config.K):
+                X_est[:, :, t] = dynamics_propagator.f(config.dt, X_est[:, :, t - 1])
+            X_est = lm.apply(config.dt, X_est, Y)
             X_est_all.append(X_est)
     if args.algorithm == "fcekf":
-        fcekf = FCEKF(Q, R)
+        fcekf = FCEKF(Q, config.R)
         for m in tqdm(range(M)):
             # Observations
-            Y = np.zeros((9, 1, T))
-            for t in range(T):
+            Y = np.zeros((9, 1, config.K))
+            for t in range(config.K):
                 Y[:, :, t] = np.concatenate(
                     (
                         fcekf.h_function_chief(X_true[:, :, t]),
@@ -139,39 +124,41 @@ def run_simulation(args):
                     ),
                     axis=0,
                 ) + np.random.normal(
-                    0, np.sqrt(np.diag(R)).reshape((9, 1)), size=(9, 1)
+                    0, np.sqrt(np.diag(config.R)).reshape((9, 1)), size=(9, 1)
                 )
 
             # Initial state vector and state covariance estimate
             X_est = np.zeros_like(X_true)
             initial_dev = np.concatenate(
                 (
-                    p_pos_initial * np.random.randn(3, 1),
-                    p_vel_initial * np.random.randn(3, 1),
-                    p_pos_initial * np.random.randn(3, 1),
-                    p_vel_initial * np.random.randn(3, 1),
-                    p_pos_initial * np.random.randn(3, 1),
-                    p_vel_initial * np.random.randn(3, 1),
-                    p_pos_initial * np.random.randn(3, 1),
-                    p_vel_initial * np.random.randn(3, 1),
+                    config.p_pos_initial * np.random.randn(3, 1),
+                    config.p_vel_initial * np.random.randn(3, 1),
+                    config.p_pos_initial * np.random.randn(3, 1),
+                    config.p_vel_initial * np.random.randn(3, 1),
+                    config.p_pos_initial * np.random.randn(3, 1),
+                    config.p_vel_initial * np.random.randn(3, 1),
+                    config.p_pos_initial * np.random.randn(3, 1),
+                    config.p_vel_initial * np.random.randn(3, 1),
                 )
             )
             X_est[:, :, 0] = X_initial + initial_dev
             P = np.diag(initial_dev.reshape(-1) ** 2)
-            for t in range(1, T):
-                X_est[:, :, t], P = fcekf.apply(dt, X_est[:, :, t - 1], P, Y[:, :, t])
+            for t in range(1, config.K):
+                X_est[:, :, t], P = fcekf.apply(
+                    config.dt, X_est[:, :, t - 1], P, Y[:, :, t]
+                )
             X_est_all.append(X_est)
     elif args.algorithm == "hcmci":
-        Q = block_diag(*[Q[i*6:(i+1)*6, i*6:(i+1)*6] for i in range(4)])
-        fcekf = FCEKF(Q, R)
-        chief_hcmci = HCMCI(np.linalg.inv(Q), np.linalg.inv(R))
-        deputy1_hcmci = HCMCI(np.linalg.inv(Q), np.linalg.inv(R))
-        deputy2_hcmci = HCMCI(np.linalg.inv(Q), np.linalg.inv(R))
-        deputy3_hcmci = HCMCI(np.linalg.inv(Q), np.linalg.inv(R))
+        Q = np.diag(np.diag(Q))
+        fcekf = FCEKF(Q, config.R)
+        chief_hcmci = HCMCI(np.linalg.inv(Q), np.linalg.inv(config.R))
+        deputy1_hcmci = HCMCI(np.linalg.inv(Q), np.linalg.inv(config.R))
+        deputy2_hcmci = HCMCI(np.linalg.inv(Q), np.linalg.inv(config.R))
+        deputy3_hcmci = HCMCI(np.linalg.inv(Q), np.linalg.inv(config.R))
         for m in tqdm(range(M)):
             # Observations
-            Y = np.zeros((9, 1, T))
-            for t in range(T):
+            Y = np.zeros((9, 1, config.K))
+            for t in range(config.K):
                 Y[:, :, t] = np.concatenate(
                     (
                         fcekf.h_function_chief(X_true[:, :, t]),
@@ -179,7 +166,7 @@ def run_simulation(args):
                     ),
                     axis=0,
                 ) + np.random.normal(
-                    0, np.sqrt(np.diag(R)).reshape((9, 1)), size=(9, 1)
+                    0, np.sqrt(np.diag(config.R)).reshape((9, 1)), size=(9, 1)
                 )
 
             # Initial state vector and state covariance estimate
@@ -190,14 +177,14 @@ def run_simulation(args):
             X_est_deputy3 = np.zeros_like(X_true)
             initial_dev = np.concatenate(
                 (
-                    p_pos_initial * np.random.randn(3, 1),
-                    p_vel_initial * np.random.randn(3, 1),
-                    p_pos_initial * np.random.randn(3, 1),
-                    p_vel_initial * np.random.randn(3, 1),
-                    p_pos_initial * np.random.randn(3, 1),
-                    p_vel_initial * np.random.randn(3, 1),
-                    p_pos_initial * np.random.randn(3, 1),
-                    p_vel_initial * np.random.randn(3, 1),
+                    config.p_pos_initial * np.random.randn(3, 1),
+                    config.p_vel_initial * np.random.randn(3, 1),
+                    config.p_pos_initial * np.random.randn(3, 1),
+                    config.p_vel_initial * np.random.randn(3, 1),
+                    config.p_pos_initial * np.random.randn(3, 1),
+                    config.p_vel_initial * np.random.randn(3, 1),
+                    config.p_pos_initial * np.random.randn(3, 1),
+                    config.p_vel_initial * np.random.randn(3, 1),
                 )
             )
             X_est[:, :, 0] = X_initial + initial_dev
@@ -210,14 +197,14 @@ def run_simulation(args):
             Omega_deputy2 = np.linalg.inv(np.diag(initial_dev.reshape(-1) ** 2))
             Omega_deputy3 = np.linalg.inv(np.diag(initial_dev.reshape(-1) ** 2))
 
-            for t in range(1, T):
+            for t in range(1, config.K):
                 (
                     q_chief,
                     Omega_chief,
                     delta_q_chief,
                     delta_Omega_chief,
                 ) = chief_hcmci.prediction(
-                    dt, X_est_chief[:, :, t - 1], Omega_chief, Y[:, :, t]
+                    config.dt, X_est_chief[:, :, t - 1], Omega_chief, Y[:, :, t]
                 )
                 (
                     q_deputy1,
@@ -225,7 +212,7 @@ def run_simulation(args):
                     delta_q_deputy1,
                     delta_Omega_deputy1,
                 ) = deputy1_hcmci.prediction(
-                    dt, X_est_deputy1[:, :, t - 1], Omega_deputy1, Y[:, :, t]
+                    config.dt, X_est_deputy1[:, :, t - 1], Omega_deputy1, Y[:, :, t]
                 )
                 (
                     q_deputy2,
@@ -233,7 +220,7 @@ def run_simulation(args):
                     delta_q_deputy2,
                     delta_Omega_deputy2,
                 ) = deputy2_hcmci.prediction(
-                    dt, X_est_deputy2[:, :, t - 1], Omega_deputy2, Y[:, :, t]
+                    config.dt, X_est_deputy2[:, :, t - 1], Omega_deputy2, Y[:, :, t]
                 )
                 (
                     q_deputy3,
@@ -241,7 +228,7 @@ def run_simulation(args):
                     delta_q_deputy3,
                     delta_Omega_deputy3,
                 ) = deputy3_hcmci.prediction(
-                    dt, X_est_deputy3[:, :, t - 1], Omega_deputy3, Y[:, :, t]
+                    config.dt, X_est_deputy3[:, :, t - 1], Omega_deputy3, Y[:, :, t]
                 )
 
                 # Consensus
@@ -278,101 +265,101 @@ def run_simulation(args):
                     delta_q_deputy3, delta_Omega_deputy3, q_deputy3, Omega_deputy3, L
                 )
 
-                for l in range(1, L + 1):
-                    delta_q_vec_chief[:, :, l] = pi * (
+                for l in range(1, config.L + 1):
+                    delta_q_vec_chief[:, :, l] = config.pi * (
                         delta_q_vec_chief[:, :, l - 1]
                         + delta_q_vec_deputy1[:, :, l - 1]
                         + delta_q_vec_deputy2[:, :, l - 1]
                         + delta_q_vec_deputy3[:, :, l - 1]
                     )
-                    delta_q_vec_deputy1[:, :, l] = pi * (
+                    delta_q_vec_deputy1[:, :, l] = config.pi * (
                         delta_q_vec_chief[:, :, l - 1]
                         + delta_q_vec_deputy1[:, :, l - 1]
                         + delta_q_vec_deputy2[:, :, l - 1]
                         + delta_q_vec_deputy3[:, :, l - 1]
                     )
-                    delta_q_vec_deputy2[:, :, l] = pi * (
+                    delta_q_vec_deputy2[:, :, l] = config.pi * (
                         delta_q_vec_chief[:, :, l - 1]
                         + delta_q_vec_deputy1[:, :, l - 1]
                         + delta_q_vec_deputy2[:, :, l - 1]
                         + delta_q_vec_deputy3[:, :, l - 1]
                     )
-                    delta_q_vec_deputy3[:, :, l] = pi * (
+                    delta_q_vec_deputy3[:, :, l] = config.pi * (
                         delta_q_vec_chief[:, :, l - 1]
                         + delta_q_vec_deputy1[:, :, l - 1]
                         + delta_q_vec_deputy2[:, :, l - 1]
                         + delta_q_vec_deputy3[:, :, l - 1]
                     )
 
-                    delta_Omega_vec_chief[:, :, l] = pi * (
+                    delta_Omega_vec_chief[:, :, l] = config.pi * (
                         delta_Omega_vec_chief[:, :, l - 1]
                         + delta_Omega_vec_deputy1[:, :, l - 1]
                         + delta_Omega_vec_deputy2[:, :, l - 1]
                         + delta_Omega_vec_deputy3[:, :, l - 1]
                     )
-                    delta_Omega_vec_deputy1[:, :, l] = pi * (
+                    delta_Omega_vec_deputy1[:, :, l] = config.pi * (
                         delta_Omega_vec_chief[:, :, l - 1]
                         + delta_Omega_vec_deputy1[:, :, l - 1]
                         + delta_Omega_vec_deputy2[:, :, l - 1]
                         + delta_Omega_vec_deputy3[:, :, l - 1]
                     )
-                    delta_Omega_vec_deputy2[:, :, l] = pi * (
+                    delta_Omega_vec_deputy2[:, :, l] = config.pi * (
                         delta_Omega_vec_chief[:, :, l - 1]
                         + delta_Omega_vec_deputy1[:, :, l - 1]
                         + delta_Omega_vec_deputy2[:, :, l - 1]
                         + delta_Omega_vec_deputy3[:, :, l - 1]
                     )
-                    delta_Omega_vec_deputy3[:, :, l] = pi * (
+                    delta_Omega_vec_deputy3[:, :, l] = config.pi * (
                         delta_Omega_vec_chief[:, :, l - 1]
                         + delta_Omega_vec_deputy1[:, :, l - 1]
                         + delta_Omega_vec_deputy2[:, :, l - 1]
                         + delta_Omega_vec_deputy3[:, :, l - 1]
                     )
 
-                    q_vec_chief[:, :, l] = pi * (
+                    q_vec_chief[:, :, l] = config.pi * (
                         q_vec_chief[:, :, l - 1]
                         + q_vec_deputy1[:, :, l - 1]
                         + q_vec_deputy2[:, :, l - 1]
                         + q_vec_deputy3[:, :, l - 1]
                     )
-                    q_vec_deputy1[:, :, l] = pi * (
+                    q_vec_deputy1[:, :, l] = config.pi * (
                         q_vec_chief[:, :, l - 1]
                         + q_vec_deputy1[:, :, l - 1]
                         + q_vec_deputy2[:, :, l - 1]
                         + q_vec_deputy3[:, :, l - 1]
                     )
-                    q_vec_deputy2[:, :, l] = pi * (
+                    q_vec_deputy2[:, :, l] = config.pi * (
                         q_vec_chief[:, :, l - 1]
                         + q_vec_deputy1[:, :, l - 1]
                         + q_vec_deputy2[:, :, l - 1]
                         + q_vec_deputy3[:, :, l - 1]
                     )
-                    q_vec_deputy3[:, :, l] = pi * (
+                    q_vec_deputy3[:, :, l] = config.pi * (
                         q_vec_chief[:, :, l - 1]
                         + q_vec_deputy1[:, :, l - 1]
                         + q_vec_deputy2[:, :, l - 1]
                         + q_vec_deputy3[:, :, l - 1]
                     )
 
-                    Omega_vec_chief[:, :, l] = pi * (
+                    Omega_vec_chief[:, :, l] = config.pi * (
                         Omega_vec_chief[:, :, l - 1]
                         + Omega_vec_deputy1[:, :, l - 1]
                         + Omega_vec_deputy2[:, :, l - 1]
                         + Omega_vec_deputy3[:, :, l - 1]
                     )
-                    Omega_vec_deputy1[:, :, l] = pi * (
+                    Omega_vec_deputy1[:, :, l] = config.pi * (
                         Omega_vec_chief[:, :, l - 1]
                         + Omega_vec_deputy1[:, :, l - 1]
                         + Omega_vec_deputy2[:, :, l - 1]
                         + Omega_vec_deputy3[:, :, l - 1]
                     )
-                    Omega_vec_deputy2[:, :, l] = pi * (
+                    Omega_vec_deputy2[:, :, l] = config.pi * (
                         Omega_vec_chief[:, :, l - 1]
                         + Omega_vec_deputy1[:, :, l - 1]
                         + Omega_vec_deputy2[:, :, l - 1]
                         + Omega_vec_deputy3[:, :, l - 1]
                     )
-                    Omega_vec_deputy3[:, :, l] = pi * (
+                    Omega_vec_deputy3[:, :, l] = config.pi * (
                         Omega_vec_chief[:, :, l - 1]
                         + Omega_vec_deputy1[:, :, l - 1]
                         + Omega_vec_deputy2[:, :, l - 1]
@@ -384,28 +371,28 @@ def run_simulation(args):
                     delta_Omega_vec_chief,
                     q_vec_chief,
                     Omega_vec_chief,
-                    gamma,
+                    config.gamma,
                 )
                 X_est_deputy1[:, :, t], Omega_deputy1 = deputy1_hcmci.correction(
                     delta_q_vec_deputy1,
                     delta_Omega_vec_deputy1,
                     q_vec_deputy1,
                     Omega_vec_deputy1,
-                    gamma,
+                    config.gamma,
                 )
                 X_est_deputy2[:, :, t], Omega_deputy2 = deputy2_hcmci.correction(
                     delta_q_vec_deputy2,
                     delta_Omega_vec_deputy2,
                     q_vec_deputy2,
                     Omega_vec_deputy2,
-                    gamma,
+                    config.gamma,
                 )
                 X_est_deputy3[:, :, t], Omega_deputy3 = deputy3_hcmci.correction(
                     delta_q_vec_deputy3,
                     delta_Omega_vec_deputy3,
                     q_vec_deputy3,
                     Omega_vec_deputy3,
-                    gamma,
+                    config.gamma,
                 )
                 X_est[:, :, t] = np.concatenate(
                     (
@@ -418,15 +405,15 @@ def run_simulation(args):
                 )
             X_est_all.append(X_est)
     elif args.algorithm == "ccekf":
-        fcekf = FCEKF(Q, R)
-        chief_ekf = EKF(Q_chief, R_chief)
-        deputy1_ccekf = CCEKF(Q_deputies, R_deputies)
-        deputy2_ccekf = CCEKF(Q_deputies, R_deputies)
-        deputy3_ccekf = CCEKF(Q_deputies, R_deputies)
+        fcekf = FCEKF(Q, config.R)
+        chief_ekf = EKF(Q_chief, config.R_chief)
+        deputy1_ccekf = CCEKF(Q_deputies, config.R_deputies)
+        deputy2_ccekf = CCEKF(Q_deputies, config.R_deputies)
+        deputy3_ccekf = CCEKF(Q_deputies, config.R_deputies)
         for m in tqdm(range(M)):
             # Observations
-            Y = np.zeros((9, 1, T))
-            for t in range(T):
+            Y = np.zeros((9, 1, config.K))
+            for t in range(config.K):
                 Y[:, :, t] = np.concatenate(
                     (
                         fcekf.h_function_chief(X_true[:, :, t]),
@@ -434,7 +421,7 @@ def run_simulation(args):
                     ),
                     axis=0,
                 ) + np.random.normal(
-                    0, np.sqrt(np.diag(R)).reshape((9, 1)), size=(9, 1)
+                    0, np.sqrt(np.diag(config.R)).reshape((9, 1)), size=(9, 1)
                 )
 
             # Initial state vector and state covariance estimate
@@ -445,14 +432,14 @@ def run_simulation(args):
             X_est_deputy3 = np.zeros_like(X_true[6:])
             initial_dev = np.concatenate(
                 (
-                    p_pos_initial * np.random.randn(3, 1),
-                    p_vel_initial * np.random.randn(3, 1),
-                    p_pos_initial * np.random.randn(3, 1),
-                    p_vel_initial * np.random.randn(3, 1),
-                    p_pos_initial * np.random.randn(3, 1),
-                    p_vel_initial * np.random.randn(3, 1),
-                    p_pos_initial * np.random.randn(3, 1),
-                    p_vel_initial * np.random.randn(3, 1),
+                    config.p_pos_initial * np.random.randn(3, 1),
+                    config.p_vel_initial * np.random.randn(3, 1),
+                    config.p_pos_initial * np.random.randn(3, 1),
+                    config.p_vel_initial * np.random.randn(3, 1),
+                    config.p_pos_initial * np.random.randn(3, 1),
+                    config.p_vel_initial * np.random.randn(3, 1),
+                    config.p_pos_initial * np.random.randn(3, 1),
+                    config.p_vel_initial * np.random.randn(3, 1),
                 )
             )
             X_est[:, :, 0] = X_initial + initial_dev
@@ -468,16 +455,16 @@ def run_simulation(args):
             P_deputy2_chief = np.zeros((18, 6))
             P_deputy3_chief = np.zeros((18, 6))
 
-            for t in range(1, T):
+            for t in range(1, config.K):
                 X_est_chief[:, :, t], P_chief = chief_ekf.apply(
-                    dt, X_est_chief[:, :, t - 1], P_chief, Y[:3, :, t]
+                    config.dt, X_est_chief[:, :, t - 1], P_chief, Y[:3, :, t]
                 )
                 (
                     X_est_deputy1[:, :, t],
                     P_deputy1,
                     P_deputy1_chief,
                 ) = deputy1_ccekf.apply(
-                    dt,
+                    config.dt,
                     X_est_deputy1[:, :, t - 1],
                     P_deputy1,
                     P_deputy1_chief,
@@ -490,7 +477,7 @@ def run_simulation(args):
                     P_deputy2,
                     P_deputy2_chief,
                 ) = deputy2_ccekf.apply(
-                    dt,
+                    config.dt,
                     X_est_deputy2[:, :, t - 1],
                     P_deputy2,
                     P_deputy2_chief,
@@ -503,7 +490,7 @@ def run_simulation(args):
                     P_deputy3,
                     P_deputy3_chief,
                 ) = deputy3_ccekf.apply(
-                    dt,
+                    config.dt,
                     X_est_deputy3[:, :, t - 1],
                     P_deputy3,
                     P_deputy3_chief,
@@ -521,13 +508,41 @@ def run_simulation(args):
                     axis=0,
                 )
             X_est_all.append(X_est)
+    elif args.algorithm == "newton":
+        newton = Newton()
+        for m in tqdm(range(M), desc="MC runs", leave=True):
+            # Set the random seed for reproducibility
+            if config.seed is not None:
+                np.random.seed(config.seed)
+            
+            # Generate observations
+            # Y = np.zeros((config.o, 1, config.K))
+            # for k in range(config.K):
+            #     Y[:, :, k] = newton.h(X_true[:, :, k]) + np.random.multivariate_normal(np.zeros(config.o), config.R).reshape((config.o, 1))
+            Y = np.zeros((config.o_tree, 1, config.K))
+            for k in range(config.K):
+                Y[:, :, k] = newton.h(X_true[:, :, k]) + np.random.multivariate_normal(np.zeros(config.o_tree), config.R_tree).reshape((config.o_tree, 1))
+
+            # Initial guess for the state vector
+            X_est = np.zeros_like(X_true)
+            # for k in range(config.H):
+            #     X_est[:, :, k] = None
+            x_init = X_initial + np.random.multivariate_normal(np.zeros(config.n), config.P_0).reshape((config.n, 1))
+            
+            # Run the framework
+            for k in tqdm(range(config.H - 1, config.K), desc="Windows", leave=False):
+                x_init, x_est_k = newton.solve_MHE_problem(k, Y, x_init, X_true[:, :, k - config.H + 1],  X_true[:, :, k])
+                X_est[:, :, k] = x_est_k
+                # Warm-start
+                x_init = dynamics_propagator.f(config.dt, x_init)
+            X_est_all.append(X_est)
     elif args.algorithm == "cnkkt":
-        fcekf = FCEKF(Q, R)
-        cnkkt = CNKKT(W, R_chief, r_deputy_pos)
+        fcekf = FCEKF(Q, config.R)
+        cnkkt = CNKKT(config.H, config.R_chief, config.r_deputy_pos)
         for m in tqdm(range(M), desc="MC runs", leave=True):
             # Observations
-            Y = np.zeros((9, 1, T))
-            for t in range(T):
+            Y = np.zeros((9, 1, config.K))
+            for t in range(config.K):
                 Y[:, :, t] = np.concatenate(
                     (
                         fcekf.h_function_chief(X_true[:, :, t]),
@@ -535,32 +550,32 @@ def run_simulation(args):
                     ),
                     axis=0,
                 ) + np.random.normal(
-                    0, np.sqrt(np.diag(R)).reshape((9, 1)), size=(9, 1)
+                    0, np.sqrt(np.diag(config.R)).reshape((9, 1)), size=(9, 1)
                 )
 
             # Initial state vector and state covariance estimate
             initial_dev = np.concatenate(
                 (
-                    p_pos_initial * np.random.randn(3, 1),
-                    p_vel_initial * np.random.randn(3, 1),
-                    p_pos_initial * np.random.randn(3, 1),
-                    p_vel_initial * np.random.randn(3, 1),
-                    p_pos_initial * np.random.randn(3, 1),
-                    p_vel_initial * np.random.randn(3, 1),
-                    p_pos_initial * np.random.randn(3, 1),
-                    p_vel_initial * np.random.randn(3, 1),
+                    config.p_pos_initial * np.random.randn(3, 1),
+                    config.p_vel_initial * np.random.randn(3, 1),
+                    config.p_pos_initial * np.random.randn(3, 1),
+                    config.p_vel_initial * np.random.randn(3, 1),
+                    config.p_pos_initial * np.random.randn(3, 1),
+                    config.p_vel_initial * np.random.randn(3, 1),
+                    config.p_pos_initial * np.random.randn(3, 1),
+                    config.p_vel_initial * np.random.randn(3, 1),
                 )
             )
-            X_est = cnkkt.apply(dt, X_initial + initial_dev, Y)
+            X_est = cnkkt.apply(config.dt, X_initial + initial_dev, Y)
             X_est_all.append(X_est)
-        X_true = X_true[:, :, : T - W + 1]
+        X_true = X_true[:, :, : config.K - config.H + 1]
     elif args.algorithm == "unkkt":
-        fcekf = FCEKF(Q, R)
-        unkkt = UNKKT(W, R_chief, r_deputy_pos)
+        fcekf = FCEKF(Q, config.R)
+        unkkt = UNKKT(config.H, config.R_chief, config.r_deputy_pos)
         for m in tqdm(range(M), desc="MC runs", leave=True):
             # Observations
-            Y = np.zeros((9, 1, T))
-            for t in range(T):
+            Y = np.zeros((9, 1, config.K))
+            for t in range(config.K):
                 Y[:, :, t] = np.concatenate(
                     (
                         fcekf.h_function_chief(X_true[:, :, t]),
@@ -568,31 +583,31 @@ def run_simulation(args):
                     ),
                     axis=0,
                 ) + np.random.normal(
-                    0, np.sqrt(np.diag(R)).reshape((9, 1)), size=(9, 1)
+                    0, np.sqrt(np.diag(config.R)).reshape((9, 1)), size=(9, 1)
                 )
 
             # Initial state vector and state covariance estimate
             initial_dev = np.concatenate(
                 (
-                    p_pos_initial * np.random.randn(3, 1),
-                    p_vel_initial * np.random.randn(3, 1),
-                    p_pos_initial * np.random.randn(3, 1),
-                    p_vel_initial * np.random.randn(3, 1),
-                    p_pos_initial * np.random.randn(3, 1),
-                    p_vel_initial * np.random.randn(3, 1),
-                    p_pos_initial * np.random.randn(3, 1),
-                    p_vel_initial * np.random.randn(3, 1),
+                    config.p_pos_initial * np.random.randn(3, 1),
+                    config.p_vel_initial * np.random.randn(3, 1),
+                    config.p_pos_initial * np.random.randn(3, 1),
+                    config.p_vel_initial * np.random.randn(3, 1),
+                    config.p_pos_initial * np.random.randn(3, 1),
+                    config.p_vel_initial * np.random.randn(3, 1),
+                    config.p_pos_initial * np.random.randn(3, 1),
+                    config.p_vel_initial * np.random.randn(3, 1),
                 )
             )
-            X_est = unkkt.apply(dt, X_initial + initial_dev, Y)
+            X_est = unkkt.apply(config.dt, X_initial + initial_dev, Y)
             X_est_all.append(X_est)
-        X_true = X_true[:, :, : T - W + 1]
+        X_true = X_true[:, :, : config.K - config.H + 1]
     elif args.algorithm == "approxh-newton":
-        approxh_newton = approxH_Newton(W, R_chief, r_deputy_pos)
+        approxh_newton = approxH_Newton(config.H, config.R_chief, config.r_deputy_pos)
         for m in tqdm(range(M), desc="MC runs", leave=True):
             # Observations
-            Y = np.zeros((9, 1, T))
-            for t in range(T):
+            Y = np.zeros((9, 1, config.K))
+            for t in range(config.K):
                 Y[:, :, t] = np.concatenate(
                     (
                         approxh_newton.h_function_chief(X_true[:, :, t]),
@@ -600,31 +615,31 @@ def run_simulation(args):
                     ),
                     axis=0,
                 ) + np.random.normal(
-                    0, np.sqrt(np.diag(R)).reshape((9, 1)), size=(9, 1)
+                    0, np.sqrt(np.diag(config.R)).reshape((9, 1)), size=(9, 1)
                 )
 
             # Initial state vector and state covariance estimate
             initial_dev = np.concatenate(
                 (
-                    p_pos_initial * np.random.randn(3, 1),
-                    p_vel_initial * np.random.randn(3, 1),
-                    p_pos_initial * np.random.randn(3, 1),
-                    p_vel_initial * np.random.randn(3, 1),
-                    p_pos_initial * np.random.randn(3, 1),
-                    p_vel_initial * np.random.randn(3, 1),
-                    p_pos_initial * np.random.randn(3, 1),
-                    p_vel_initial * np.random.randn(3, 1),
+                    config.p_pos_initial * np.random.randn(3, 1),
+                    config.p_vel_initial * np.random.randn(3, 1),
+                    config.p_pos_initial * np.random.randn(3, 1),
+                    config.p_vel_initial * np.random.randn(3, 1),
+                    config.p_pos_initial * np.random.randn(3, 1),
+                    config.p_vel_initial * np.random.randn(3, 1),
+                    config.p_pos_initial * np.random.randn(3, 1),
+                    config.p_vel_initial * np.random.randn(3, 1),
                 )
             )
-            X_est = approxh_newton.apply(dt, X_initial + initial_dev, Y, X_true)
+            X_est = approxh_newton.apply(config.dt, X_initial + initial_dev, Y, X_true)
             X_est_all.append(X_est)
-        X_true = X_true[:, :, : T - W + 1]
+        X_true = X_true[:, :, : config.K - config.H + 1]
     elif args.algorithm == "mm-newton":
-        mm_newton = MM_Newton(W, R_chief, r_deputy_pos)
+        mm_newton = MM_Newton(config.H, config.R_chief, config.r_deputy_pos)
         for m in tqdm(range(M), desc="MC runs", leave=True):
             # Observations
-            Y = np.zeros((9, 1, T))
-            for t in range(T):
+            Y = np.zeros((9, 1, config.K))
+            for t in range(config.K):
                 Y[:, :, t] = np.concatenate(
                     (
                         mm_newton.h_function_chief(X_true[:, :, t]),
@@ -632,25 +647,25 @@ def run_simulation(args):
                     ),
                     axis=0,
                 ) + np.random.normal(
-                    0, np.sqrt(np.diag(R)).reshape((9, 1)), size=(9, 1)
+                    0, np.sqrt(np.diag(config.R)).reshape((9, 1)), size=(9, 1)
                 )
 
             # Initial state vector and state covariance estimate
             initial_dev = np.concatenate(
                 (
-                    p_pos_initial * np.random.randn(3, 1),
-                    p_vel_initial * np.random.randn(3, 1),
-                    p_pos_initial * np.random.randn(3, 1),
-                    p_vel_initial * np.random.randn(3, 1),
-                    p_pos_initial * np.random.randn(3, 1),
-                    p_vel_initial * np.random.randn(3, 1),
-                    p_pos_initial * np.random.randn(3, 1),
-                    p_vel_initial * np.random.randn(3, 1),
+                    config.p_pos_initial * np.random.randn(3, 1),
+                    config.p_vel_initial * np.random.randn(3, 1),
+                    config.p_pos_initial * np.random.randn(3, 1),
+                    config.p_vel_initial * np.random.randn(3, 1),
+                    config.p_pos_initial * np.random.randn(3, 1),
+                    config.p_vel_initial * np.random.randn(3, 1),
+                    config.p_pos_initial * np.random.randn(3, 1),
+                    config.p_vel_initial * np.random.randn(3, 1),
                 )
             )
-            X_est = mm_newton.apply(dt, X_initial + initial_dev, Y, X_true)
+            X_est = mm_newton.apply(config.dt, X_initial + initial_dev, Y, X_true)
             X_est_all.append(X_est)
-        X_true = X_true[:, :, : T - W + 1]
+        X_true = X_true[:, :, : config.K - config.H + 1]
 
     # Compute average RMSE
     rmse_chief_values = []
@@ -658,10 +673,18 @@ def run_simulation(args):
     rmse_deputy2_values = []
     rmse_deputy3_values = []
     for m in range(M):
-        rmse_chief = rmse(X_est_all[m][:6, :, T_RMSE:], X_true[:6, :, T_RMSE:])
-        rmse_deputy1 = rmse(X_est_all[m][6:12, :, T_RMSE:], X_true[6:12, :, T_RMSE:])
-        rmse_deputy2 = rmse(X_est_all[m][12:18, :, T_RMSE:], X_true[12:18, :, T_RMSE:])
-        rmse_deputy3 = rmse(X_est_all[m][18:24, :, T_RMSE:], X_true[18:24, :, T_RMSE:])
+        rmse_chief = rmse(
+            X_est_all[m][:6, :, config.K_RMSE :], X_true[:6, :, config.K_RMSE :]
+        )
+        rmse_deputy1 = rmse(
+            X_est_all[m][6:12, :, config.K_RMSE :], X_true[6:12, :, config.K_RMSE :]
+        )
+        rmse_deputy2 = rmse(
+            X_est_all[m][12:18, :, config.K_RMSE :], X_true[12:18, :, config.K_RMSE :]
+        )
+        rmse_deputy3 = rmse(
+            X_est_all[m][18:24, :, config.K_RMSE :], X_true[18:24, :, config.K_RMSE :]
+        )
         if (
             rmse_chief < config.invalid_rmse
             and rmse_deputy1 < config.invalid_rmse

@@ -130,14 +130,11 @@ def visualizer_devs(args):
     )
 
     # Simulation parameters
-    dt = 60.0  # Time step [s]
     T = np.shape(data["true"])[2]  # Duration [min]
-    T_RMSE = T - 95  # Duration for RMSE calculation [min]
-    time = np.arange(0, T) / dt  # Time vector [h]
-    M = len(data) - 1  # Number of Monte Carlo simulations
+    time = np.arange(0, T) * config.dt / 3600  # Time vector [h]
 
     # Get data to plot
-    dev_chief, dev_deputy1, dev_deputy2, dev_deputy3 = metrics(T_RMSE, data)
+    dev_chief, dev_deputy1, dev_deputy2, dev_deputy3 = metrics(config.K_RMSE, data)
 
     # Plot positions based on screen size
     fig_width = 2 * 6.4  # in inches
