@@ -12,7 +12,7 @@ class SimulationConfig:
     # Simulation parameters
     dt: float = 10.0  # Time step [s] (1, 5, 10, 20, 30, 60)
     K: int = (
-        570  # Simulation duration in timesteps (57000, 11400, 5700, 2850, 1900, 950)
+        5700  # Simulation duration in timesteps (57000, 11400, 5700, 2850, 1900, 950)
     )
     H: int = 2  # Window size [timesteps]
     seed: int = 42  # Random seed for reproducibility
