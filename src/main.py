@@ -69,6 +69,7 @@ def main():
             "hcmci",
             "ccekf",
             "newton",
+            "gauss-newton",
             "tree-newton",
             "approxA-newton",
             "mm-newton",
@@ -79,11 +80,12 @@ def main():
         fcekf: fully centralized EKF;
         hcmci: hybrid Consensus-based;
         ccekf: Consider Covariance EKF;
-        newton: Newton's method for tree-structured output coupling topology;
-        tree-newton: Newton's method variant treeNewton for general output coupling topology;
-        approxA-newton: Newton's method variant approxANewton for general output coupling topology;
-        mm-newton: Newton's method variant MMNewton for general output coupling topology;
-        inewton: Newton's method variant iNewton for general output coupling topology""",
+        newton: Newton's method;
+        gauss-newton: GaussNewton method;
+        tree-newton: Newton's method variant;
+        approxA-newton: Newton's method variant;
+        mm-newton: Newton's method variant;
+        inewton: Newton's method variant""",
     )
     parser.add_argument(
         "-M",

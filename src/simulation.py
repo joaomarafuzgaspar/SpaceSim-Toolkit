@@ -13,6 +13,7 @@ from fcekf import FCEKF
 from hcmci import HCMCI
 from ccekf import EKF, CCEKF
 from newton import Newton
+from gauss_newton import GaussNewton
 from approxh_newton import approxH_Newton
 from mm_newton import MM_Newton
 from dynamics import Dynamics
@@ -554,72 +555,32 @@ def run_simulation(args):
                     config.dt, x_init
                 )  # Warm-start for the next MHE problem
             X_est_all.append(X_est)
-    elif args.algorithm == "cnkkt":
-        fcekf = FCEKF(Q, config.R)
-        cnkkt = CNKKT(config.H, config.R_chief, config.r_deputy_pos)
+    elif args.algorithm == "gauss-newton":
+        gauss_newton = GaussNewton()
         for m in tqdm(range(M), desc="MC runs", leave=True):
-            # Observations
-            Y = np.zeros((9, 1, config.K))
-            for t in range(config.K):
-                Y[:, :, t] = np.concatenate(
-                    (
-                        fcekf.h_function_chief(X_true[:, :, t]),
-                        fcekf.h_function_deputy(X_true[:, :, t]),
-                    ),
-                    axis=0,
-                ) + np.random.normal(
-                    0, np.sqrt(np.diag(config.R)).reshape((9, 1)), size=(9, 1)
-                )
+            # Generate observations
+            Y = np.zeros((config.o, 1, config.K))
+            for k in range(config.K):
+                Y[:, :, k] = config.h(X_true[:, :, k]) + np.random.multivariate_normal(
+                    np.zeros(config.o), config.R
+                ).reshape((config.o, 1))
 
-            # Initial state vector and state covariance estimate
-            initial_dev = np.concatenate(
-                (
-                    config.p_pos_initial * np.random.randn(3, 1),
-                    config.p_vel_initial * np.random.randn(3, 1),
-                    config.p_pos_initial * np.random.randn(3, 1),
-                    config.p_vel_initial * np.random.randn(3, 1),
-                    config.p_pos_initial * np.random.randn(3, 1),
-                    config.p_vel_initial * np.random.randn(3, 1),
-                    config.p_pos_initial * np.random.randn(3, 1),
-                    config.p_vel_initial * np.random.randn(3, 1),
-                )
-            )
-            X_est = cnkkt.apply(config.dt, X_initial + initial_dev, Y)
-            X_est_all.append(X_est)
-        X_true = X_true[:, :, : config.K - config.H + 1]
-    elif args.algorithm == "unkkt":
-        fcekf = FCEKF(Q, config.R)
-        unkkt = UNKKT(config.H, config.R_chief, config.r_deputy_pos)
-        for m in tqdm(range(M), desc="MC runs", leave=True):
-            # Observations
-            Y = np.zeros((9, 1, config.K))
-            for t in range(config.K):
-                Y[:, :, t] = np.concatenate(
-                    (
-                        fcekf.h_function_chief(X_true[:, :, t]),
-                        fcekf.h_function_deputy(X_true[:, :, t]),
-                    ),
-                    axis=0,
-                ) + np.random.normal(
-                    0, np.sqrt(np.diag(config.R)).reshape((9, 1)), size=(9, 1)
-                )
+            # Initial guess for the state vector
+            X_est = np.full_like(X_true, np.nan)
+            x_init = X_initial + np.random.multivariate_normal(
+                np.zeros(config.n), config.P_0
+            ).reshape((config.n, 1))
 
-            # Initial state vector and state covariance estimate
-            initial_dev = np.concatenate(
-                (
-                    config.p_pos_initial * np.random.randn(3, 1),
-                    config.p_vel_initial * np.random.randn(3, 1),
-                    config.p_pos_initial * np.random.randn(3, 1),
-                    config.p_vel_initial * np.random.randn(3, 1),
-                    config.p_pos_initial * np.random.randn(3, 1),
-                    config.p_vel_initial * np.random.randn(3, 1),
-                    config.p_pos_initial * np.random.randn(3, 1),
-                    config.p_vel_initial * np.random.randn(3, 1),
+            # Run the framework
+            for k in tqdm(range(config.H - 1, config.K), desc="Windows", leave=False):
+                x_init, x_est_k = gauss_newton.solve_MHE_problem(
+                    k, Y, x_init, X_true[:, :, k - config.H + 1], X_true[:, :, k]
                 )
-            )
-            X_est = unkkt.apply(config.dt, X_initial + initial_dev, Y)
+                X_est[:, :, k] = x_est_k
+                x_init = dynamics_propagator.f(
+                    config.dt, x_init
+                )  # Warm-start for the next MHE problem
             X_est_all.append(X_est)
-        X_true = X_true[:, :, : config.K - config.H + 1]
     elif args.algorithm == "approxh-newton":
         approxh_newton = approxH_Newton(config.H, config.R_chief, config.r_deputy_pos)
         for m in tqdm(range(M), desc="MC runs", leave=True):
