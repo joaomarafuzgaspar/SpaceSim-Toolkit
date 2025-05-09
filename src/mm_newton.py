@@ -5,7 +5,7 @@ from scipy.linalg import solve
 from dynamics import SatelliteDynamics
 
 
-class MM_Newton:
+class MMNewton:
     """
     This class implements the Newton method with an approximated Hessian for optimization.
     """

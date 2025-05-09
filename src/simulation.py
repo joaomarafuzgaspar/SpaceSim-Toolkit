@@ -8,14 +8,6 @@ from tqdm import tqdm
 from scipy.linalg import block_diag
 
 
-from lm import LM
-from fcekf import FCEKF
-from hcmci import HCMCI
-from ccekf import EKF, CCEKF
-from newton import Newton
-from gauss_newton import GaussNewton
-from approxh_newton import approxH_Newton
-from mm_newton import MM_Newton
 from dynamics import Dynamics
 from utils import (
     rmse,
@@ -24,6 +16,19 @@ from utils import (
     get_form_initial_conditions,
 )
 from config import SimulationConfig as config
+
+
+from lm import LM
+from fcekf import FCEKF
+from hcmci import HCMCI
+from ccekf import EKF, CCEKF
+from newton import Newton
+from gauss_newton import GaussNewton
+# from tree_newton import treeNewton
+# from approxA_newton import approxANewton
+# from mm_newton import MMNewton
+# from inewton import iNewton
+# from dr_newton import DRNewton
 
 
 def run_tudat_propagation(args):
@@ -119,7 +124,9 @@ def run_simulation(args):
                     X_true[:, :, k - config.H + 1 : k + 1],
                 )
                 if k < config.K - 1:
-                    X_est[:, :, k + 1] = dynamics_propagator.f(config.dt, X_est[:, :, k])
+                    X_est[:, :, k + 1] = dynamics_propagator.f(
+                        config.dt, X_est[:, :, k]
+                    )
             X_est_all.append(X_est)
     elif args.algorithm == "fcekf":
         fcekf = FCEKF(Q, config.R)
@@ -581,70 +588,6 @@ def run_simulation(args):
                     config.dt, x_init
                 )  # Warm-start for the next MHE problem
             X_est_all.append(X_est)
-    elif args.algorithm == "approxh-newton":
-        approxh_newton = approxH_Newton(config.H, config.R_chief, config.r_deputy_pos)
-        for m in tqdm(range(M), desc="MC runs", leave=True):
-            # Observations
-            Y = np.zeros((9, 1, config.K))
-            for t in range(config.K):
-                Y[:, :, t] = np.concatenate(
-                    (
-                        approxh_newton.h_function_chief(X_true[:, :, t]),
-                        approxh_newton.h_function_deputy(X_true[:, :, t]),
-                    ),
-                    axis=0,
-                ) + np.random.normal(
-                    0, np.sqrt(np.diag(config.R)).reshape((9, 1)), size=(9, 1)
-                )
-
-            # Initial state vector and state covariance estimate
-            initial_dev = np.concatenate(
-                (
-                    config.p_pos_initial * np.random.randn(3, 1),
-                    config.p_vel_initial * np.random.randn(3, 1),
-                    config.p_pos_initial * np.random.randn(3, 1),
-                    config.p_vel_initial * np.random.randn(3, 1),
-                    config.p_pos_initial * np.random.randn(3, 1),
-                    config.p_vel_initial * np.random.randn(3, 1),
-                    config.p_pos_initial * np.random.randn(3, 1),
-                    config.p_vel_initial * np.random.randn(3, 1),
-                )
-            )
-            X_est = approxh_newton.apply(config.dt, X_initial + initial_dev, Y, X_true)
-            X_est_all.append(X_est)
-        X_true = X_true[:, :, : config.K - config.H + 1]
-    elif args.algorithm == "mm-newton":
-        mm_newton = MM_Newton(config.H, config.R_chief, config.r_deputy_pos)
-        for m in tqdm(range(M), desc="MC runs", leave=True):
-            # Observations
-            Y = np.zeros((9, 1, config.K))
-            for t in range(config.K):
-                Y[:, :, t] = np.concatenate(
-                    (
-                        mm_newton.h_function_chief(X_true[:, :, t]),
-                        mm_newton.h_function_deputy(X_true[:, :, t]),
-                    ),
-                    axis=0,
-                ) + np.random.normal(
-                    0, np.sqrt(np.diag(config.R)).reshape((9, 1)), size=(9, 1)
-                )
-
-            # Initial state vector and state covariance estimate
-            initial_dev = np.concatenate(
-                (
-                    config.p_pos_initial * np.random.randn(3, 1),
-                    config.p_vel_initial * np.random.randn(3, 1),
-                    config.p_pos_initial * np.random.randn(3, 1),
-                    config.p_vel_initial * np.random.randn(3, 1),
-                    config.p_pos_initial * np.random.randn(3, 1),
-                    config.p_vel_initial * np.random.randn(3, 1),
-                    config.p_pos_initial * np.random.randn(3, 1),
-                    config.p_vel_initial * np.random.randn(3, 1),
-                )
-            )
-            X_est = mm_newton.apply(config.dt, X_initial + initial_dev, Y, X_true)
-            X_est_all.append(X_est)
-        X_true = X_true[:, :, : config.K - config.H + 1]
 
     # Compute average RMSE
     rmse_chief_values = []

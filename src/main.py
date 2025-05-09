@@ -82,10 +82,11 @@ def main():
         ccekf: Consider Covariance EKF;
         newton: Newton's method;
         gauss-newton: GaussNewton method;
-        tree-newton: Newton's method variant;
-        approxA-newton: Newton's method variant;
-        mm-newton: Newton's method variant;
-        inewton: Newton's method variant""",
+        tree-newton: Newton's method variant based on tree-structured Hessian;
+        approxA-newton: Newton's method variant based on approximated Hessian (tree-structured Hessian + diagonal elements from the residual Hessian);
+        mm-newton: Newton's method variant based on Majorization-Minimization for the cost function;
+        inewton: Newton's method variant based on an iterative method to solve the linear system;
+        dr-newton: Newton's method variant based on Douglas-Rachford splitting.""",
     )
     parser.add_argument(
         "-M",
