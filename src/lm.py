@@ -1,297 +1,178 @@
+# src/lm.py
 import numpy as np
 
-from dynamics import SatelliteDynamics
+
 from scipy.linalg import fractional_matrix_power
 
 
+from dynamics import Dynamics
+from config import SimulationConfig as config
+
+
 class LM:
-    """
-    This class implements the Levenberg-Marquardt algorithm for the weighted nonlinear least squares problem.
-    """
+    def __init__(self, Q):
+        # Dynamics model
+        self.Q_invsqrt = fractional_matrix_power(Q, -1 / 2)
+        self.dyn = Dynamics()
 
-    def __init__(self, Q, R):
-        """
-        Initialize the LM class.
+        # Observation model
+        self.R_invsqrt = fractional_matrix_power(config.R, -1 / 2)
+        self.h = config.h
+        self.Dh = config.Dh
 
-        Parameters:
-        Q (np.array): Process noise covariance matrix.
-        R (np.array): Measurement noise covariance matrix.
-        SatelliteDynamics (class): Satellite dynamics model instance.
-        """
-        # Define noise covariances
-        self.Q = Q  # Process noise covariance
-        self.R = R  # Measurement noise covariance
+        # Storage for results
+        self.iterations = None
+        self.cost_values = []
+        self.gradient_norm_values = []
 
-        self.dynamic_model = SatelliteDynamics()
-
-    def h_function_chief(self, x_vec):
-        """
-        Compute the measurement vector for the chief satellite's position.
-
-        Parameters:
-        x_vec (np.array): Current state vector of the satellite (position [km] and velocity [km/s]).
-
-        Returns:
-        np.array: Position components of the state vector.
-        """
-        return x_vec[0:3]
-
-    def H_jacobian_chief(self):
-        """
-        Compute the Jacobian of the measurement function for the chief satellite.
-
-        Returns:
-        np.array: Jacobian matrix of the measurement function.
-        """
-        H = np.zeros((3, 24))
-        H[0:3, 0:3] = np.eye(3)
-        return H
-
-    def h_function_deputy(self, x_vec):
-        """
-        Compute the measurement vector for relative distances between satellites.
-
-        Parameters:
-        x_vec (np.array): Current state vector of the satellites.
-
-        Returns:
-        np.array: Measurement vector containing distances between satellites.
-        """
-        r_chief = x_vec[:3]
-        r_deputy1 = x_vec[6:9]
-        r_deputy2 = x_vec[12:15]
-        r_deputy3 = x_vec[18:21]
-
-        range_deputy1_chief = np.linalg.norm(r_deputy1 - r_chief)
-        range_deputy1_deputy2 = np.linalg.norm(r_deputy1 - r_deputy2)
-        range_deputy1_deputy3 = np.linalg.norm(r_deputy1 - r_deputy3)
-        range_deputy2_chief = np.linalg.norm(r_deputy2 - r_chief)
-        range_deputy2_deputy3 = np.linalg.norm(r_deputy2 - r_deputy3)
-        range_deputy3_chief = np.linalg.norm(r_deputy3 - r_chief)
-
-        return np.array(
-            [
-                [range_deputy1_chief],
-                [range_deputy1_deputy2],
-                [range_deputy1_deputy3],
-                [range_deputy2_chief],
-                [range_deputy2_deputy3],
-                [range_deputy3_chief],
-            ]
-        )
-
-    def H_jacobian_deputy(self, x_vec):
-        """
-        Compute the Jacobian of the measurement function for relative distances between satellites.
-
-        Parameters:
-        x_vec (np.array): Current state vector of the satellites.
-
-        Returns:
-        np.array: Jacobian matrix for the relative distances.
-        """
-        r_chief = x_vec[:3]
-        r_deputy1 = x_vec[6:9]
-        r_deputy2 = x_vec[12:15]
-        r_deputy3 = x_vec[18:21]
-
-        range_deputy1_chief = np.linalg.norm(r_deputy1 - r_chief)
-        range_deputy1_deputy2 = np.linalg.norm(r_deputy1 - r_deputy2)
-        range_deputy1_deputy3 = np.linalg.norm(r_deputy1 - r_deputy3)
-        range_deputy2_chief = np.linalg.norm(r_deputy2 - r_chief)
-        range_deputy2_deputy3 = np.linalg.norm(r_deputy2 - r_deputy3)
-        range_deputy3_chief = np.linalg.norm(r_deputy3 - r_chief)
-
-        H = np.zeros((6, 24))
-        H[0, 0:3] = -(r_deputy1 - r_chief).reshape(-1) / range_deputy1_chief
-        H[0, 6:9] = (r_deputy1 - r_chief).reshape(-1) / range_deputy1_chief
-        H[1, 6:9] = (r_deputy1 - r_deputy2).reshape(-1) / range_deputy1_deputy2
-        H[1, 12:15] = -(r_deputy1 - r_deputy2).reshape(-1) / range_deputy1_deputy2
-        H[2, 6:9] = (r_deputy1 - r_deputy3).reshape(-1) / range_deputy1_deputy3
-        H[2, 18:21] = -(r_deputy1 - r_deputy3).reshape(-1) / range_deputy1_deputy3
-        H[3, 0:3] = -(r_deputy2 - r_chief).reshape(-1) / range_deputy2_chief
-        H[3, 12:15] = (r_deputy2 - r_chief).reshape(-1) / range_deputy2_chief
-        H[4, 12:15] = (r_deputy2 - r_deputy3).reshape(-1) / range_deputy2_deputy3
-        H[4, 18:21] = -(r_deputy2 - r_deputy3).reshape(-1) / range_deputy2_deputy3
-        H[5, 0:3] = -(r_deputy3 - r_chief).reshape(-1) / range_deputy3_chief
-        H[5, 18:21] = (r_deputy3 - r_chief).reshape(-1) / range_deputy3_chief
-        return H
-
-    def h(self, x_vec):
-        """
-        Combine the measurement functions for both the chief and deputies.
-
-        Parameters:
-        x_vec (np.array): State vector of the satellites.
-
-        Returns:
-        np.array: Combined measurement vector.
-        """
-        return np.concatenate(
-            [self.h_function_chief(x_vec), self.h_function_deputy(x_vec)]
-        )
-
-    def H(self, x_vec):
-        """
-        Combine the Jacobians for both the chief and deputies.
-
-        Parameters:
-        x_vec (np.array): State vector of the satellites.
-
-        Returns:
-        np.array: Combined Jacobian matrix.
-        """
-        return np.concatenate((self.H_jacobian_chief(), self.H_jacobian_deputy(x_vec)))
-
-    def r_function(self, X, Y):
-        """
-        Compute the residual vector for the state and measurements.
-
-        Parameters:
-        X (np.array): State vector across all time steps.
-        Y (np.array): Measurement data.
-
-        Returns:
-        np.array: Residual vector.
-        """
-        K = Y.shape[2]
-        n_x = 6
-        n_y_1 = 3
-        n_y_2 = 2
-        n_y_3 = 2
-        n_y_4 = 2
-        r = np.zeros(((4 * n_x + n_y_1 + n_y_2 + n_y_3 + n_y_4) * K, 1))
+    def r(self, X, Y):
+        r_z = np.zeros(((config.n + config.o) * config.H, 1))
         # Process noise
-        for k in range(K - 1):
-            X_k = X[4 * n_x * k : 4 * n_x * (k + 1)]
-            X_k_1 = X[4 * n_x * (k + 1) : 4 * n_x * (k + 2)]
-            r[
-                k * 4 * n_x
-                + k * (n_y_1 + n_y_2 + n_y_3 + n_y_4) : (k + 1) * 4 * n_x
-                + k * (n_y_1 + n_y_2 + n_y_3 + n_y_4),
-                :,
-            ] = fractional_matrix_power(self.Q, -1 / 2) @ (
-                X_k_1 - self.dynamic_model.x_new(self.dt, X_k)
-            )
+        for tau in range(config.H - 1):
+            X_tau = X[:, :, tau]
+            X_tau_plus_1 = X[:, :, tau + 1]
+            r_z[
+                (config.n + config.o) * tau : (config.n + config.o) * tau + config.n, :
+            ] = self.Q_invsqrt @ (X_tau_plus_1 - self.dyn.f(config.dt, X_tau))
         # Observation noise
-        for k in range(K):
-            X_k = X[4 * n_x * k : 4 * n_x * (k + 1)]
-            Y_k = Y[:, :, k]
-            r[
-                (k + 1) * 4 * n_x
-                + k * (n_y_1 + n_y_2 + n_y_3 + n_y_4) : (k + 1) * 4 * n_x
-                + (k + 1) * (n_y_1 + n_y_2 + n_y_3 + n_y_4),
+        for tau in range(config.H):
+            X_tau = X[:, :, tau]
+            Y_k = Y[:, :, tau]
+            r_z[
+                (config.n + config.o) * tau
+                + config.n : (config.n + config.o) * (tau + 1),
                 :,
-            ] = fractional_matrix_power(self.R, -1 / 2) @ (Y_k - self.h(X_k))
-        return r
+            ] = self.R_invsqrt @ (Y_k - self.h(X_tau))
+        return r_z
 
-    def J_jacobian(self, X, Y):
-        """
-        Compute the Jacobian of the residual function.
-
-        Parameters:
-        X (np.array): State vector across all time steps.
-        Y (np.array): Measurement data.
-
-        Returns:
-        np.array: Jacobian of the residual function.
-        """
-        K = Y.shape[2]
-        n_x = 6
-        n_y_1 = 3
-        n_y_2 = 2
-        n_y_3 = 2
-        n_y_4 = 2
-        J = np.zeros(((4 * n_x + n_y_1 + n_y_2 + n_y_3 + n_y_4) * K, 4 * n_x * K))
-        for k in range(K):
-            X_k = X[4 * n_x * k : 4 * n_x * (k + 1)]
-            _, F_k = self.dynamic_model.x_new_and_F(self.dt, X_k)
-            if k < K - 1:
-                J[
-                    k * 4 * n_x
-                    + k * (n_y_1 + n_y_2 + n_y_3 + n_y_4) : (k + 1) * 4 * n_x
-                    + k * (n_y_1 + n_y_2 + n_y_3 + n_y_4),
-                    k * 4 * n_x : (k + 1) * 4 * n_x,
+    def J(self, X):
+        J_z = np.zeros(((config.n + config.o) * config.H, config.n * config.H))
+        for tau in range(config.H):
+            X_tau = X[:, :, tau]
+            Df_X_tau = self.dyn.Df(config.dt, X_tau)
+            if tau < config.H - 1:
+                J_z[
+                    (config.n + config.o) * tau : (config.n + config.o) * tau
+                    + config.n,
+                    config.n * tau : config.n * (tau + 1),
                 ] = (
-                    -fractional_matrix_power(self.Q, -1 / 2) @ F_k
+                    -self.Q_invsqrt @ Df_X_tau
                 )
-                J[
-                    k * 4 * n_x
-                    + k * (n_y_1 + n_y_2 + n_y_3 + n_y_4) : (k + 1) * 4 * n_x
-                    + k * (n_y_1 + n_y_2 + n_y_3 + n_y_4),
-                    (k + 1) * 4 * n_x : (k + 2) * 4 * n_x,
-                ] = fractional_matrix_power(self.Q, -1 / 2)
-            J[
-                (k + 1) * 4 * n_x
-                + k * (n_y_1 + n_y_2 + n_y_3 + n_y_4) : (k + 1) * 4 * n_x
-                + (k + 1) * (n_y_1 + n_y_2 + n_y_3 + n_y_4),
-                k * 4 * n_x : (k + 1) * 4 * n_x,
-            ] = -fractional_matrix_power(self.R, -1 / 2) @ self.H(X_k)
-        return J
+                J_z[
+                    (config.n + config.o) * tau : (config.n + config.o) * tau
+                    + config.n,
+                    config.n * (tau + 1) : config.n * (tau + 2),
+                ] = self.Q_invsqrt
+            J_z[
+                (config.n + config.o) * tau
+                + config.n : (config.n + config.o) * (tau + 1),
+                config.n * tau : config.n * (tau + 1),
+            ] = -self.R_invsqrt @ self.Dh(X_tau)
+        return J_z
 
     def cost_function(self, X, Y):
-        """
-        Compute the cost function (residual norm squared).
+        return 1 / 2 * np.linalg.norm(self.r(X, Y)) ** 2
 
-        Parameters:
-        X (np.array): State vector across all time steps.
-        Y (np.array): Measurement data.
+    def solve_MHE_problem(self, k, Y, X_init, X_true):
+        if k < config.H - 1 or k + 1 > config.K:
+            raise ValueError("k is out of bounds")
 
-        Returns:
-        float: Cost function value.
-        """
-        return np.linalg.norm(self.r_function(X, Y)) ** 2
+        X_est_m = X_init.copy()
 
-    def apply(self, dt, X_initial, Y):
-        """
-        Run the Levenberg-Marquardt algorithm to estimate the state.
+        prev_cost_value = None
+        prev_gradient_norm_value = None
+        prev_global_estimation_error = None
 
-        Parameters:
-        dt (float): Time step.
-        X_initial (np.array): Initial guess of the state vector.
-        Y (np.array): Measurement data.
+        lambda_m = config.lambda_0
 
-        Returns:
-        np.array: Estimated state vector.
-        """
-        self.dt = dt
-        lambda_0 = 1.0
-        X_est_i = X_initial.reshape(-1, 1, order="F")
-        lambda_i = lambda_0
-        epsilon = 1e-6
-        max_iter = 100
+        for iteration in range(config.max_iter + 1):
+            # Compute the cost function and gradient
+            r_z_m = self.r(X_est_m, Y)
+            J_m = self.J(X_est_m)
 
-        i = 0
+            # Convergence tracking
+            cost_value = self.cost_function(X_est_m, Y)
+            gradient_norm_value = np.linalg.norm(J_m.T @ r_z_m)
 
-        while i < max_iter:
-            r = self.r_function(X_est_i, Y)
-            J = self.J_jacobian(X_est_i, Y)
+            # Store the values
+            self.cost_values.append(cost_value)
+            self.gradient_norm_values.append(gradient_norm_value)
 
-            # For plotting the results
-            grad_i_norm = np.linalg.norm(J.T @ r)
+            # Metrics
+            if prev_cost_value is not None:
+                cost_value_change = (
+                    (cost_value - prev_cost_value) / abs(prev_cost_value) * 100
+                )
+                gradient_norm_value_change = (
+                    (gradient_norm_value - prev_gradient_norm_value)
+                    / abs(prev_gradient_norm_value)
+                    * 100
+                )
+                global_estimation_error_change = (
+                    (np.linalg.norm(X_est_m - X_true) - prev_global_estimation_error)
+                    / abs(prev_global_estimation_error)
+                    * 100
+                )
+            prev_cost_value = cost_value
+            prev_gradient_norm_value = gradient_norm_value
+            prev_global_estimation_error = np.linalg.norm(X_est_m - X_true)
 
-            if grad_i_norm < epsilon:
+            # Check convergence and print metrics
+            if gradient_norm_value < config.epsilon or iteration == config.max_iter:
+                reason = (
+                    "tolerance reached"
+                    if gradient_norm_value < config.epsilon
+                    else (
+                        "max iteration reached"
+                        if iteration == config.max_iter
+                        else "gradient norm stagnated"
+                    )
+                )
+                print(f"[Levenberg-Marquardt] STOP on Iteration {iteration} ({reason})")
                 print(
-                    f"STOOOOP\nIteration {i}\nGrad_i_norm = {grad_i_norm}\nx_pred_i cost = {self.cost_function(X_pred_i, Y)} | x_bold_i cost = {self.cost_function(X_est_i, Y)}\nlambda_i = {lambda_i}\n"
+                    f"Cost function = {cost_value} ({cost_value_change:.2f}%)\nGradient norm = {gradient_norm_value} ({gradient_norm_value_change:.2f}%)\nGlobal estimation error = {np.linalg.norm(X_est_m - X_true)} ({global_estimation_error_change:.2f}%)"
+                )
+                print(
+                    f"Final initial conditions estimation errors: {np.linalg.norm(X_est_m[:config.n_p, :, 0] - X_true[:config.n_p, :, 0])} m, {np.linalg.norm(X_est_m[config.n_x : config.n_x + config.n_p, :, 0] - X_true[config.n_x : config.n_x + config.n_p, :, 0])} m, {np.linalg.norm(X_est_m[2 * config.n_x : 2 * config.n_x + config.n_p, :, 0] - X_true[2 * config.n_x : 2 * config.n_x + config.n_p, :, 0])} m, {np.linalg.norm(X_est_m[3 * config.n_x : 3 * config.n_x + config.n_p, :, 0] - X_true[3 * config.n_x : 3 * config.n_x + config.n_p, :, 0])} m"
+                )
+                print(
+                    f"Final position estimation errors: {np.linalg.norm(X_est_m[:config.n_p, :, -1] - X_true[:config.n_p, :, -1])} m, {np.linalg.norm(X_est_m[config.n_x : config.n_x + config.n_p, :, -1] - X_true[config.n_x : config.n_x + config.n_p, :, -1])} m, {np.linalg.norm(X_est_m[2 * config.n_x : 2 * config.n_x + config.n_p, :, -1] - X_true[2 * config.n_x : 2 * config.n_x + config.n_p, :, -1])} m, {np.linalg.norm(X_est_m[3 * config.n_x : 3 * config.n_x + config.n_p, :, -1] - X_true[3 * config.n_x : 3 * config.n_x + config.n_p, :, -1])} m\n"
                 )
                 break
+            else:
+                if iteration == 0:
+                    print(
+                        f"[Levenberg-Marquardt] Before applying the algorithm\nCost function: {cost_value}\nGradient norm: {gradient_norm_value}\nGlobal estimation error: {np.linalg.norm(X_est_m - X_true)}"
+                    )
+                else:
+                    print(
+                        f"[Levenberg-Marquardt] Iteration {iteration}\nCost function: {cost_value} ({cost_value_change:.2f}%)\nGradient norm: {gradient_norm_value} ({gradient_norm_value_change:.2f}%)\nGlobal estimation error: {np.linalg.norm(X_est_m - X_true)} ({global_estimation_error_change:.2f}%)"
+                    )
 
-            # Solve for the update step
-            delta_x = np.linalg.inv(J.T @ J + lambda_i * np.eye(J.shape[1])) @ J.T @ r
-            X_pred_i = X_est_i - delta_x
-
+            # Print estimation errors
             print(
-                f"Iteration {i}\nGrad_i_norm = {grad_i_norm}\nx_pred_i cost = {self.cost_function(X_pred_i, Y)} | x_bold_i cost = {self.cost_function(X_est_i, Y)}\nlambda_i = {lambda_i}\n"
+                f"Initial conditions estimation errors: {np.linalg.norm(X_est_m[:config.n_p, :, 0] - X_true[:config.n_p, :, 0])} m, {np.linalg.norm(X_est_m[config.n_x : config.n_x + config.n_p, :, 0] - X_true[config.n_x : config.n_x + config.n_p, :, 0])} m, {np.linalg.norm(X_est_m[2 * config.n_x : 2 * config.n_x + config.n_p, :, 0] - X_true[2 * config.n_x : 2 * config.n_x + config.n_p, :, 0])} m, {np.linalg.norm(X_est_m[3 * config.n_x : 3 * config.n_x + config.n_p, :, 0] - X_true[3 * config.n_x : 3 * config.n_x + config.n_p, :, 0])} m"
+            )
+            print(
+                f"Position estimation errors: {np.linalg.norm(X_est_m[:config.n_p, :, -1] - X_true[:config.n_p, :, -1])} m, {np.linalg.norm(X_est_m[config.n_x : config.n_x + config.n_p, :, -1] - X_true[config.n_x : config.n_x + config.n_p, :, -1])} m, {np.linalg.norm(X_est_m[2 * config.n_x : 2 * config.n_x + config.n_p, :, -1] - X_true[2 * config.n_x : 2 * config.n_x + config.n_p, :, -1])} m, {np.linalg.norm(X_est_m[3 * config.n_x : 3 * config.n_x + config.n_p, :, -1] - X_true[3 * config.n_x : 3 * config.n_x + config.n_p, :, -1])} m\n"
             )
 
-            if self.cost_function(
-                X_pred_i,
-                Y,
-            ) < self.cost_function(X_est_i, Y):
-                X_est_i = X_pred_i
-                lambda_i *= 0.7
-            else:
-                lambda_i *= 2.0
-            i += 1
+            # Solve for the update step
+            delta_x = (
+                -np.linalg.inv(J_m.T @ J_m + lambda_m * np.eye(config.n * config.H))
+                @ J_m.T
+                @ r_z_m
+            )
+            X_pred_m = X_est_m + delta_x.reshape(config.H, 1, config.n).T
 
-        return X_est_i.reshape(Y.shape[2], 1, 24).T
+            # Update the estimate
+            if self.cost_function(X_pred_m, Y) < self.cost_function(X_est_m, Y):
+                X_est_m = X_pred_m
+                lambda_m *= 0.7
+            else:
+                lambda_m *= 2.0
+
+            # Save the current iteration
+            self.iterations = iteration + 1
+
+        return X_est_m

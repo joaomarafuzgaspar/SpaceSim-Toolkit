@@ -1128,7 +1128,7 @@ class Dynamics:
 
     def diff_eq(self, x_vec):
         x_dot_vec = np.zeros_like(x_vec)
-        for i in range(config.N):
+        for i in range(int(x_vec.shape[0] / config.n_x)):
             x_vec_i = x_vec[i * config.n_x : i * config.n_x + config.n_x]
             v_vec_i = x_vec_i[config.n_p : config.n_x]
             x_dot_vec[i * config.n_x : i * config.n_x + config.n_x] = np.concatenate(
@@ -1141,7 +1141,7 @@ class Dynamics:
 
     def Ddiff_eq(self, x_vec):
         first_order_der = np.zeros((config.n, config.n))
-        for i in range(config.N):
+        for i in range(int(x_vec.shape[0] / config.n_x)):
             x_vec_i = x_vec[i * config.n_x : i * config.n_x + config.n_x]
             first_order_der[
                 i * config.n_x : i * config.n_x + config.n_p,
@@ -1163,7 +1163,7 @@ class Dynamics:
 
     def Hdiff_eq(self, x_vec):
         second_order_der = np.zeros((config.n, config.n, config.n))
-        for i in range(config.N):
+        for i in range(int(x_vec.shape[0] / config.n_x)):
             x_vec_i = x_vec[i * config.n_x : i * config.n_x + config.n_x]
             aux_pp = (
                 self.d2a_grav_dp_vec_dp_vecT(x_vec_i)
@@ -1219,6 +1219,20 @@ class Dynamics:
         Dk3 = self.Ddiff_eq(x_old + dt / 2 * k2) @ (np.eye(config.n) + dt / 2 * Dk2)
         Dk4 = self.Ddiff_eq(x_old + dt * k3) @ (np.eye(config.n) + dt * Dk3)
         return np.eye(config.n) + dt / 6 * (Dk1 + 2 * Dk2 + 2 * Dk3 + Dk4)
+
+    def f_and_Df(self, dt, x_old):  # more efficient
+        k1 = self.diff_eq(x_old)
+        k2 = self.diff_eq(x_old + dt / 2 * k1)
+        k3 = self.diff_eq(x_old + dt / 2 * k2)
+        k4 = self.diff_eq(x_old + dt * k3)
+
+        Dk1 = self.Ddiff_eq(x_old)
+        Dk2 = self.Ddiff_eq(x_old + dt / 2 * k1) @ (np.eye(config.n) + dt / 2 * Dk1)
+        Dk3 = self.Ddiff_eq(x_old + dt / 2 * k2) @ (np.eye(config.n) + dt / 2 * Dk2)
+        Dk4 = self.Ddiff_eq(x_old + dt * k3) @ (np.eye(config.n) + dt * Dk3)
+        return x_old + dt / 6 * (k1 + 2 * k2 + 2 * k3 + k4), np.eye(
+            config.n
+        ) + dt / 6 * (Dk1 + 2 * Dk2 + 2 * Dk3 + Dk4)
 
     def Hf(self, dt, x_old):
         k1 = self.diff_eq(x_old)

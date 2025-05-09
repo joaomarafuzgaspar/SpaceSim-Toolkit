@@ -1,15 +1,18 @@
+# src/simulation.py
 import pickle
 import numpy as np
 import pandas as pd
 
+
 from tqdm import tqdm
+from scipy.linalg import block_diag
+
+
 from lm import LM
 from fcekf import FCEKF
 from hcmci import HCMCI
 from ccekf import EKF, CCEKF
 from newton import Newton
-from cnkkt import CNKKT
-from unkkt import UNKKT
 from approxh_newton import approxH_Newton
 from mm_newton import MM_Newton
 from dynamics import Dynamics
@@ -54,7 +57,12 @@ def run_simulation(args):
 
     # Process noise covariance matrix estimation
     dynamics_propagator = Dynamics()
-    if args.algorithm == "lm" or args.algorithm == "fcekf" or args.algorithm == "hcmci" or args.algorithm == "ccekf":
+    if (
+        args.algorithm == "lm"
+        or args.algorithm == "fcekf"
+        or args.algorithm == "hcmci"
+        or args.algorithm == "ccekf"
+    ):
         K_true = X_true.shape[2]
         X_dynamics_propagator = np.zeros((config.n, 1, K_true))
         X_dynamics_propagator[:, :, 0] = X_initial
@@ -68,50 +76,51 @@ def run_simulation(args):
         )
         diff = X_tudat_propagator - X_dynamics_propagator
         Q = np.cov(diff.T)
-        print("Estimated process noise covariance matrix :\n", pd.DataFrame(Q))
         Q_chief = Q[: config.n_x, : config.n_x]
         Q_deputies = Q[config.n_x :, config.n_x :]
-    X_true = X_true[:, :, : config.K] # Truncate the true state vector to the simulation duration
+        if args.algorithm == "lm" or args.algorithm == "hcmci":
+            Q = np.diag(np.diag(Q))
+        print("Estimated process noise covariance matrix :\n", pd.DataFrame(Q))
+    X_true = X_true[
+        :, :, : config.K
+    ]  # Truncate the true state vector to the simulation duration
+
+    # Set the random seed for reproducibility
+    if config.seed is not None:
+        np.random.seed(config.seed)
 
     # Simulation
     X_est_all = []
     if args.algorithm == "lm":
-        fcekf = FCEKF(Q, config.R)
-        lm = LM(Q, config.R)
-        for m in tqdm(range(M)):
-            # Observations
-            Y = np.zeros((9, 1, config.K))
-            for t in range(config.K):
-                Y[:, :, t] = np.concatenate(
-                    (
-                        fcekf.h_function_chief(X_true[:, :, t]),
-                        fcekf.h_function_deputy(X_true[:, :, t]),
-                    ),
-                    axis=0,
-                ) + np.random.normal(
-                    0, np.sqrt(np.diag(config.R)).reshape((9, 1)), size=(9, 1)
-                )
+        lm = LM(Q)
+        for m in tqdm(range(M), desc="MC runs", leave=True):
+            # Generate observations
+            Y = np.zeros((config.o, 1, config.K))
+            for k in range(config.K):
+                Y[:, :, k] = config.h(X_true[:, :, k]) + np.random.multivariate_normal(
+                    np.zeros(config.o), config.R
+                ).reshape((config.o, 1))
 
-            # Initial state vector and state covariance estimate
-            X_est = np.zeros_like(X_true)
-            initial_dev = np.concatenate(
-                (
-                    config.p_pos_initial * np.random.randn(3, 1),
-                    config.p_vel_initial * np.random.randn(3, 1),
-                    config.p_pos_initial * np.random.randn(3, 1),
-                    config.p_vel_initial * np.random.randn(3, 1),
-                    config.p_pos_initial * np.random.randn(3, 1),
-                    config.p_vel_initial * np.random.randn(3, 1),
-                    config.p_pos_initial * np.random.randn(3, 1),
-                    config.p_vel_initial * np.random.randn(3, 1),
+            # Initial guess for the state vector
+            X_est = np.full_like(X_true, np.nan)
+            X_est[:, :, 0] = X_initial + np.random.multivariate_normal(
+                np.zeros(config.n), config.P_0
+            ).reshape((config.n, 1))
+            for k in range(config.H - 1):
+                X_est[:, :, k + 1] = dynamics_propagator.f(config.dt, X_est[:, :, k])
+
+            # Run the framework
+            for k in tqdm(range(config.H - 1, config.K), desc="Windows", leave=False):
+                X_est[:, :, k - config.H + 1 : k + 1] = lm.solve_MHE_problem(
+                    k,
+                    Y[:, :, k - config.H + 1 : k + 1],
+                    X_est[:, :, k - config.H + 1 : k + 1],
+                    X_true[:, :, k - config.H + 1 : k + 1],
                 )
-            )
-            X_est[:, :, 0] = X_initial + initial_dev
-            for t in range(1, config.K):
-                X_est[:, :, t] = dynamics_propagator.f(config.dt, X_est[:, :, t - 1])
-            X_est = lm.apply(config.dt, X_est, Y)
+                if k < config.K - 1:
+                    X_est[:, :, k + 1] = dynamics_propagator.f(config.dt, X_est[:, :, k])
             X_est_all.append(X_est)
-    if args.algorithm == "fcekf":
+    elif args.algorithm == "fcekf":
         fcekf = FCEKF(Q, config.R)
         for m in tqdm(range(M)):
             # Observations
@@ -149,7 +158,6 @@ def run_simulation(args):
                 )
             X_est_all.append(X_est)
     elif args.algorithm == "hcmci":
-        Q = np.diag(np.diag(Q))
         fcekf = FCEKF(Q, config.R)
         chief_hcmci = HCMCI(np.linalg.inv(Q), np.linalg.inv(config.R))
         deputy1_hcmci = HCMCI(np.linalg.inv(Q), np.linalg.inv(config.R))
@@ -238,7 +246,7 @@ def run_simulation(args):
                     q_vec_chief,
                     Omega_vec_chief,
                 ) = chief_hcmci.init_consensus(
-                    delta_q_chief, delta_Omega_chief, q_chief, Omega_chief, L
+                    delta_q_chief, delta_Omega_chief, q_chief, Omega_chief, config.L
                 )
                 (
                     delta_q_vec_deputy1,
@@ -246,7 +254,11 @@ def run_simulation(args):
                     q_vec_deputy1,
                     Omega_vec_deputy1,
                 ) = deputy1_hcmci.init_consensus(
-                    delta_q_deputy1, delta_Omega_deputy1, q_deputy1, Omega_deputy1, L
+                    delta_q_deputy1,
+                    delta_Omega_deputy1,
+                    q_deputy1,
+                    Omega_deputy1,
+                    config.L,
                 )
                 (
                     delta_q_vec_deputy2,
@@ -254,7 +266,11 @@ def run_simulation(args):
                     q_vec_deputy2,
                     Omega_vec_deputy2,
                 ) = deputy2_hcmci.init_consensus(
-                    delta_q_deputy2, delta_Omega_deputy2, q_deputy2, Omega_deputy2, L
+                    delta_q_deputy2,
+                    delta_Omega_deputy2,
+                    q_deputy2,
+                    Omega_deputy2,
+                    config.L,
                 )
                 (
                     delta_q_vec_deputy3,
@@ -262,7 +278,11 @@ def run_simulation(args):
                     q_vec_deputy3,
                     Omega_vec_deputy3,
                 ) = deputy3_hcmci.init_consensus(
-                    delta_q_deputy3, delta_Omega_deputy3, q_deputy3, Omega_deputy3, L
+                    delta_q_deputy3,
+                    delta_Omega_deputy3,
+                    q_deputy3,
+                    Omega_deputy3,
+                    config.L,
                 )
 
                 for l in range(1, config.L + 1):
@@ -511,24 +531,28 @@ def run_simulation(args):
     elif args.algorithm == "newton":
         newton = Newton()
         for m in tqdm(range(M), desc="MC runs", leave=True):
-            # Set the random seed for reproducibility
-            if config.seed is not None:
-                np.random.seed(config.seed)
-            
             # Generate observations
             Y = np.zeros((config.o, 1, config.K))
             for k in range(config.K):
-                Y[:, :, k] = config.h(X_true[:, :, k]) + np.random.multivariate_normal(np.zeros(config.o), config.R).reshape((config.o, 1))
-            
+                Y[:, :, k] = config.h(X_true[:, :, k]) + np.random.multivariate_normal(
+                    np.zeros(config.o), config.R
+                ).reshape((config.o, 1))
+
             # Initial guess for the state vector
             X_est = np.full_like(X_true, np.nan)
-            x_init = X_initial + np.random.multivariate_normal(np.zeros(config.n), config.P_0).reshape((config.n, 1))
-            
+            x_init = X_initial + np.random.multivariate_normal(
+                np.zeros(config.n), config.P_0
+            ).reshape((config.n, 1))
+
             # Run the framework
             for k in tqdm(range(config.H - 1, config.K), desc="Windows", leave=False):
-                x_init, x_est_k = newton.solve_MHE_problem(k, Y, x_init, X_true[:, :, k - config.H + 1],  X_true[:, :, k])
+                x_init, x_est_k = newton.solve_MHE_problem(
+                    k, Y, x_init, X_true[:, :, k - config.H + 1], X_true[:, :, k]
+                )
                 X_est[:, :, k] = x_est_k
-                x_init = dynamics_propagator.f(config.dt, x_init)  # Warm-start for the next MHE problem
+                x_init = dynamics_propagator.f(
+                    config.dt, x_init
+                )  # Warm-start for the next MHE problem
             X_est_all.append(X_est)
     elif args.algorithm == "cnkkt":
         fcekf = FCEKF(Q, config.R)

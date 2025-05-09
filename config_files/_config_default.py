@@ -7,7 +7,7 @@ from scipy.linalg import block_diag
 
 @dataclass
 class SimulationConfig:
-    name_of_file: str = "config_complete_with_ranges_only.py"
+    name_of_file: str = "config.py"
 
     # Simulation parameters
     dt: float = 10.0  # Time step [s] (1, 5, 10, 20, 30, 60)
@@ -26,19 +26,17 @@ class SimulationConfig:
     n_x: int = n_p + n_v  # State vector dimension
     n: int = N * n_x  # Global state vector dimension
     o_chief: int = 3  # Chief observation vector dimension
-    o_deputy: int = 3  # Deputy observation vector dimension
+    o_deputies: int = 6  # Deputy observation vector dimension
     o: int = (
-        number_of_chiefs * o_chief + number_of_deputies * o_deputy
+        number_of_chiefs * o_chief + o_deputies
     )  # Global observation vector dimension
 
     # Observation noise
     r_chief_pos: float = 1e-1  # [m]
     R_chief: np.ndarray = np.diag(np.concatenate([r_chief_pos * np.ones(o_chief)])) ** 2
     r_deputy_pos: float = 1e0  # [m]
-    R_deputy: np.ndarray = (
-        np.diag(np.concatenate([r_deputy_pos * np.ones(o_deputy)])) ** 2
-    )
-    R: np.ndarray = block_diag(R_chief, R_deputy, R_deputy, R_deputy)
+    R_deputies: np.ndarray = np.diag(np.concatenate([r_deputy_pos * np.ones(o_deputies)])) ** 2
+    R: np.ndarray = block_diag(R_chief, R_deputies)
 
     # Initial deviation noise
     # Warm-start parameters
@@ -57,9 +55,13 @@ class SimulationConfig:
         P_0_spacecraft, P_0_spacecraft, P_0_spacecraft, P_0_spacecraft
     )
 
+    # Levenberg-Marquardt parameters
+    lambda_0: float = 1.0
+    epsilon: float = 1e-6
+    max_iter: int = 100
+
     # Consensus parameters
     L: int = 1  # Number of consensus iterations
-    N: int = 4  # Number of satellites
     gamma: float = N  # Consensus gain 1
     pi: float = 1 / N  # Consensus gain 2
 
@@ -90,11 +92,8 @@ class SimulationConfig:
                 (1, 2),
                 (1, 3),
                 (2, 0),
-                (2, 1),
                 (2, 3),
                 (3, 0),
-                (3, 1),
-                (3, 2),
             ]
         ]
         return np.concatenate((p_vecs[0], np.array(distances).reshape(-1, 1)))
@@ -107,7 +106,7 @@ class SimulationConfig:
         first_order_der[: cls.n_p, : cls.n_p] = np.eye(cls.n_p)
 
         for k, (i, j) in enumerate(
-            [(1, 0), (1, 2), (1, 3), (2, 0), (2, 1), (2, 3), (3, 0), (3, 1), (3, 2)],
+            [(1, 0), (1, 2), (1, 3), (2, 0), (2, 3), (3, 0)],
             start=cls.n_p,
         ):
             d = p_vecs[i] - p_vecs[j]
@@ -123,7 +122,7 @@ class SimulationConfig:
         p_vecs = [x_vec[i : i + cls.n_p] for i in range(0, cls.n, cls.n_x)]
 
         for k, (i, j) in enumerate(
-            [(1, 0), (1, 2), (1, 3), (2, 0), (2, 1), (2, 3), (3, 0), (3, 1), (3, 2)],
+            [(1, 0), (1, 2), (1, 3), (2, 0), (2, 3), (3, 0)],
             start=cls.n_p,
         ):
             d = p_vecs[i] - p_vecs[j]

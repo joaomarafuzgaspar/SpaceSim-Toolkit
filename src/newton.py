@@ -1,6 +1,9 @@
+# src/newton.py
 import numpy as np
 
+
 from scipy.linalg import solve
+
 
 from dynamics import Dynamics
 from config import SimulationConfig as config
