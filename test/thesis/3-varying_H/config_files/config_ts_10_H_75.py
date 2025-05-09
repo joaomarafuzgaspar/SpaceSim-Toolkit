@@ -7,14 +7,14 @@ from scipy.linalg import block_diag
 
 @dataclass
 class SimulationConfig:
-    name_of_file: str = "config_ts_10_H_30.py"
+    name_of_file: str = "config_ts_10_H_75.py"
 
     # Simulation parameters
     dt: float = 10.0  # Time step [s] (1, 5, 10, 20, 30, 60)
     K: int = (
         570  # Simulation duration in timesteps (57000, 11400, 5700, 2850, 1900, 950)
     )
-    H: int = 30  # Window size [timesteps]
+    H: int = 75  # Window size [timesteps]
     seed: int = 42  # Random seed for reproducibility
 
     # Network parameters
