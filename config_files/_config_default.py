@@ -35,7 +35,9 @@ class SimulationConfig:
     r_chief_pos: float = 1e-1  # [m]
     R_chief: np.ndarray = np.diag(np.concatenate([r_chief_pos * np.ones(o_chief)])) ** 2
     r_deputy_pos: float = 1e0  # [m]
-    R_deputies: np.ndarray = np.diag(np.concatenate([r_deputy_pos * np.ones(o_deputies)])) ** 2
+    R_deputies: np.ndarray = (
+        np.diag(np.concatenate([r_deputy_pos * np.ones(o_deputies)])) ** 2
+    )
     R: np.ndarray = block_diag(R_chief, R_deputies)
 
     # Initial deviation noise
@@ -144,6 +146,80 @@ class SimulationConfig:
                 j * cls.n_x : j * cls.n_x + cls.n_p,
                 i * cls.n_x : i * cls.n_x + cls.n_p,
             ] = -hess_d
+            second_order_der[
+                k,
+                j * cls.n_x : j * cls.n_x + cls.n_p,
+                j * cls.n_x : j * cls.n_x + cls.n_p,
+            ] = hess_d
+
+        return second_order_der.reshape((cls.o * cls.n, cls.n))
+
+    @classmethod
+    def Hh_tree(cls, x_vec):
+        second_order_der = np.zeros((cls.o, cls.n, cls.n))
+        p_vecs = [x_vec[i : i + cls.n_p] for i in range(0, cls.n, cls.n_x)]
+
+        for k, (i, j) in enumerate(
+            [(1, 0), (1, 2), (1, 3), (2, 0), (2, 3), (3, 0)],
+            start=cls.n_p,
+        ):
+            d = p_vecs[i] - p_vecs[j]
+            norm_d = np.linalg.norm(d)
+            hess_d = np.eye(cls.n_p) / norm_d - np.outer(d, d) / norm_d**3
+
+            if (i, j) in {(1, 0), (2, 0), (3, 0)}:
+                second_order_der[
+                    k,
+                    i * cls.n_x : i * cls.n_x + cls.n_p,
+                    i * cls.n_x : i * cls.n_x + cls.n_p,
+                ] = hess_d
+                second_order_der[
+                    k,
+                    i * cls.n_x : i * cls.n_x + cls.n_p,
+                    j * cls.n_x : j * cls.n_x + cls.n_p,
+                ] = -hess_d
+                second_order_der[
+                    k,
+                    j * cls.n_x : j * cls.n_x + cls.n_p,
+                    i * cls.n_x : i * cls.n_x + cls.n_p,
+                ] = -hess_d
+                second_order_der[
+                    k,
+                    j * cls.n_x : j * cls.n_x + cls.n_p,
+                    j * cls.n_x : j * cls.n_x + cls.n_p,
+                ] = hess_d
+
+        return second_order_der.reshape((cls.o * cls.n, cls.n))
+
+    @classmethod
+    def Hh_approx(cls, x_vec):
+        second_order_der = np.zeros((cls.o, cls.n, cls.n))
+        p_vecs = [x_vec[i : i + cls.n_p] for i in range(0, cls.n, cls.n_x)]
+
+        for k, (i, j) in enumerate(
+            [(1, 0), (1, 2), (1, 3), (2, 0), (2, 3), (3, 0)],
+            start=cls.n_p,
+        ):
+            d = p_vecs[i] - p_vecs[j]
+            norm_d = np.linalg.norm(d)
+            hess_d = np.eye(cls.n_p) / norm_d - np.outer(d, d) / norm_d**3
+
+            second_order_der[
+                k,
+                i * cls.n_x : i * cls.n_x + cls.n_p,
+                i * cls.n_x : i * cls.n_x + cls.n_p,
+            ] = hess_d
+            if (i, j) in {(1, 0), (2, 0), (3, 0)}:
+                second_order_der[
+                    k,
+                    i * cls.n_x : i * cls.n_x + cls.n_p,
+                    j * cls.n_x : j * cls.n_x + cls.n_p,
+                ] = -hess_d
+                second_order_der[
+                    k,
+                    j * cls.n_x : j * cls.n_x + cls.n_p,
+                    i * cls.n_x : i * cls.n_x + cls.n_p,
+                ] = -hess_d
             second_order_der[
                 k,
                 j * cls.n_x : j * cls.n_x + cls.n_p,
