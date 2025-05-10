@@ -24,7 +24,8 @@ from hcmci import HCMCI
 from ccekf import EKF, CCEKF
 from newton import Newton
 from gauss_newton import GaussNewton
-# from tree_newton import treeNewton
+from tree_newton import treeNewton
+
 # from approxA_newton import approxANewton
 # from mm_newton import MMNewton
 # from inewton import iNewton
@@ -581,6 +582,32 @@ def run_simulation(args):
             # Run the framework
             for k in tqdm(range(config.H - 1, config.K), desc="Windows", leave=False):
                 x_init, x_est_k = gauss_newton.solve_MHE_problem(
+                    k, Y, x_init, X_true[:, :, k - config.H + 1], X_true[:, :, k]
+                )
+                X_est[:, :, k] = x_est_k
+                x_init = dynamics_propagator.f(
+                    config.dt, x_init
+                )  # Warm-start for the next MHE problem
+            X_est_all.append(X_est)
+    elif args.algorithm == "tree-newton":
+        tree_newton = treeNewton()
+        for m in tqdm(range(M), desc="MC runs", leave=True):
+            # Generate observations
+            Y = np.zeros((config.o, 1, config.K))
+            for k in range(config.K):
+                Y[:, :, k] = config.h(X_true[:, :, k]) + np.random.multivariate_normal(
+                    np.zeros(config.o), config.R
+                ).reshape((config.o, 1))
+
+            # Initial guess for the state vector
+            X_est = np.full_like(X_true, np.nan)
+            x_init = X_initial + np.random.multivariate_normal(
+                np.zeros(config.n), config.P_0
+            ).reshape((config.n, 1))
+
+            # Run the framework
+            for k in tqdm(range(config.H - 1, config.K), desc="Windows", leave=False):
+                x_init, x_est_k = tree_newton.solve_MHE_problem(
                     k, Y, x_init, X_true[:, :, k - config.H + 1], X_true[:, :, k]
                 )
                 X_est[:, :, k] = x_est_k
