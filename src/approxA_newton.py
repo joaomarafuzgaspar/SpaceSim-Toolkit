@@ -1,4 +1,4 @@
-# src/newton.py
+# src/approxA_newton.py
 import numpy as np
 
 
@@ -213,7 +213,7 @@ class approxANewton:
                         else "gradient norm stagnated"
                     )
                 )
-                print(f"[Newton] STOP on Iteration {iteration} ({reason})")
+                print(f"[approxANewton] STOP on Iteration {iteration} ({reason})")
                 print(
                     f"Cost function = {cost_value} ({cost_value_change:.2f}%)\nGradient norm = {gradient_norm_value} ({gradient_norm_value_change:.2f}%)\nGlobal estimation error = {np.linalg.norm(x - x_true_initial)} ({global_estimation_error_change:.2f}%)"
                 )
@@ -227,11 +227,11 @@ class approxANewton:
             else:
                 if iteration == 0:
                     print(
-                        f"[Newton] Before applying the algorithm\nCost function: {cost_value}\nGradient norm: {gradient_norm_value}\nGlobal estimation error: {np.linalg.norm(x - x_true_initial)}"
+                        f"[approxANewton] Before applying the algorithm\nCost function: {cost_value}\nGradient norm: {gradient_norm_value}\nGlobal estimation error: {np.linalg.norm(x - x_true_initial)}"
                     )
                 else:
                     print(
-                        f"[Newton] Iteration {iteration}\nCost function: {cost_value} ({cost_value_change:.2f}%)\nGradient norm: {gradient_norm_value} ({gradient_norm_value_change:.2f}%)\nGlobal estimation error: {np.linalg.norm(x - x_true_initial)} ({global_estimation_error_change:.2f}%)"
+                        f"[approxANewton] Iteration {iteration}\nCost function: {cost_value} ({cost_value_change:.2f}%)\nGradient norm: {gradient_norm_value} ({gradient_norm_value_change:.2f}%)\nGlobal estimation error: {np.linalg.norm(x - x_true_initial)} ({global_estimation_error_change:.2f}%)"
                     )
 
             # Print estimation errors
@@ -383,7 +383,7 @@ class approxANewton:
                         else "gradient norm stagnated"
                     )
                 )
-                print(f"[Newton] STOP on Iteration {iteration} ({reason})")
+                print(f"[approxANewton] STOP on Iteration {iteration} ({reason})")
                 print(
                     f"Cost function = {cost_value} ({cost_value_change:.2f}%)\nGradient norm = {gradient_norm_value} ({gradient_norm_value_change:.2f}%)\nGlobal estimation error = {np.linalg.norm(x - x_true_initial)} ({global_estimation_error_change:.2f}%)\nHessian matrix minimum eigenvalue: {min(self.HJ_x_eigenvalues_history[-1])}\nRatios ||A|| / ||C||, ||B|| / ||C||: {self.A_norm_history[-1] / self.C_norm_history[-1]}, {self.B_norm_history[-1] / self.C_norm_history[-1]}\nSpectral radius inv(T) @ R: {spectral_radius_T_inv_R}\nT minimum eigenvalue: {min(np.linalg.eigvalsh(T_matrix_x))}"
                 )
@@ -397,11 +397,11 @@ class approxANewton:
             else:
                 if iteration == 0:
                     print(
-                        f"[Newton] Before applying the algorithm\nCost function: {cost_value}\nGradient norm: {gradient_norm_value}\nGlobal estimation error: {np.linalg.norm(x - x_true_initial)}\nHessian matrix minimum eigenvalue: {min(self.HJ_x_eigenvalues_history[-1])}\nRatios ||A|| / ||C||, ||B|| / ||C||: {self.A_norm_history[-1] / self.C_norm_history[-1]}, {self.B_norm_history[-1] / self.C_norm_history[-1]}\nSpectral radius inv(T) @ R: {spectral_radius_T_inv_R}\nT minimum eigenvalue: {min(np.linalg.eigvalsh(T_matrix_x))}"
+                        f"[approxANewton] Before applying the algorithm\nCost function: {cost_value}\nGradient norm: {gradient_norm_value}\nGlobal estimation error: {np.linalg.norm(x - x_true_initial)}\nHessian matrix minimum eigenvalue: {min(self.HJ_x_eigenvalues_history[-1])}\nRatios ||A|| / ||C||, ||B|| / ||C||: {self.A_norm_history[-1] / self.C_norm_history[-1]}, {self.B_norm_history[-1] / self.C_norm_history[-1]}\nSpectral radius inv(T) @ R: {spectral_radius_T_inv_R}\nT minimum eigenvalue: {min(np.linalg.eigvalsh(T_matrix_x))}"
                     )
                 else:
                     print(
-                        f"[Newton] Iteration {iteration}\nCost function: {cost_value} ({cost_value_change:.2f}%)\nGradient norm: {gradient_norm_value} ({gradient_norm_value_change:.2f}%)\nGlobal estimation error: {np.linalg.norm(x - x_true_initial)} ({global_estimation_error_change:.2f}%)\nHessian matrix minimum eigenvalue: {min(self.HJ_x_eigenvalues_history[-1])}\nRatios ||A|| / ||C||, ||B|| / ||C||: {self.A_norm_history[-1] / self.C_norm_history[-1]}, {self.B_norm_history[-1] / self.C_norm_history[-1]}\nSpectral radius inv(T) @ R: {spectral_radius_T_inv_R}\nT minimum eigenvalue: {min(np.linalg.eigvalsh(T_matrix_x))}"
+                        f"[approxANewton] Iteration {iteration}\nCost function: {cost_value} ({cost_value_change:.2f}%)\nGradient norm: {gradient_norm_value} ({gradient_norm_value_change:.2f}%)\nGlobal estimation error: {np.linalg.norm(x - x_true_initial)} ({global_estimation_error_change:.2f}%)\nHessian matrix minimum eigenvalue: {min(self.HJ_x_eigenvalues_history[-1])}\nRatios ||A|| / ||C||, ||B|| / ||C||: {self.A_norm_history[-1] / self.C_norm_history[-1]}, {self.B_norm_history[-1] / self.C_norm_history[-1]}\nSpectral radius inv(T) @ R: {spectral_radius_T_inv_R}\nT minimum eigenvalue: {min(np.linalg.eigvalsh(T_matrix_x))}"
                     )
 
             # Print estimation errors
