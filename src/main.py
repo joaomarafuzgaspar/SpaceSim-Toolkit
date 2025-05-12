@@ -74,6 +74,7 @@ def main():
             "approxA-newton",
             "mm-newton",
             "inewton",
+            "dr-newton",
         ],
         help="""Orbit estimation algorithm framework:
         lm: Levenberg-Marquardt applied to the weighted nonlinear least squares problem;
