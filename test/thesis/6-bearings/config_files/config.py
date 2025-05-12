@@ -41,8 +41,8 @@ class SimulationConfig:
 
     # Initial deviation noise
     # Warm-start parameters
-    p_pos_initial: float = 1e-20  # [m]
-    p_vel_initial: float = 1e-20  # [m / s]
+    p_pos_initial: float = 1e3  # [m]
+    p_vel_initial: float = 1e1  # [m / s]
     # Cold-start parameters
     # p_pos_initial: float = 1e2  # [m]
     # p_vel_initial: float = 1e0  # [m / s]
