@@ -7,8 +7,6 @@ from scipy.linalg import block_diag
 
 @dataclass
 class SimulationConfig:
-    name_of_file: str = "config_ts_60_H_30_inewton.py"
-
     # Simulation parameters
     dt: float = 60.0  # Time step [s] (1, 5, 10, 20, 30, 60)
     K: int = (
@@ -26,19 +24,19 @@ class SimulationConfig:
     n_x: int = n_p + n_v  # State vector dimension
     n: int = N * n_x  # Global state vector dimension
     o_chief: int = 3  # Chief observation vector dimension
-    o_deputies: int = 6  # Deputy observation vector dimension
+    o_deputy: int = 3  # Deputy observation vector dimension
     o: int = (
-        number_of_chiefs * o_chief + o_deputies
+        number_of_chiefs * o_chief + number_of_deputies * o_deputy
     )  # Global observation vector dimension
 
     # Observation noise
     r_chief_pos: float = 1e-1  # [m]
     R_chief: np.ndarray = np.diag(np.concatenate([r_chief_pos * np.ones(o_chief)])) ** 2
     r_deputy_pos: float = 1e0  # [m]
-    R_deputies: np.ndarray = (
-        np.diag(np.concatenate([r_deputy_pos * np.ones(o_deputies)])) ** 2
+    R_deputy: np.ndarray = (
+        np.diag(np.concatenate([r_deputy_pos * np.ones(o_deputy)])) ** 2
     )
-    R: np.ndarray = block_diag(R_chief, R_deputies)
+    R: np.ndarray = block_diag(R_chief, R_deputy, R_deputy, R_deputy)
 
     # Initial deviation noise
     # Warm-start parameters
@@ -75,9 +73,6 @@ class SimulationConfig:
     # Majorization-Minimization parameters
     mm_tol: float = 1e0
     mm_max_iter: int = 20
-    
-    # Iterative loop parameters
-    iterative_loop_max_iterations: int = 101
 
     # Post-processing parameters
     invalid_rmse: float = 1e2  # [m]
@@ -94,69 +89,25 @@ class SimulationConfig:
     @classmethod
     def h(cls, x_vec):
         p_vecs = [x_vec[i : i + cls.n_p] for i in range(0, cls.n, cls.n_x)]
-        distances = [
-            np.linalg.norm(p_vecs[i] - p_vecs[j])
-            for (i, j) in [
-                (1, 0),
-                (1, 2),
-                (1, 3),
-                (2, 0),
-                (2, 3),
-                (3, 0),
-            ]
-        ]
+        distances = [p_vecs[i] - p_vecs[j] for (i, j) in [(1, 0), (2, 0), (3, 0)]]
         return np.concatenate((p_vecs[0], np.array(distances).reshape(-1, 1)))
 
     @classmethod
     def Dh(cls, x_vec):
         first_order_der = np.zeros((cls.o, cls.n))
-        p_vecs = [x_vec[i : i + cls.n_p] for i in range(0, cls.n, cls.n_x)]
 
         first_order_der[: cls.n_p, : cls.n_p] = np.eye(cls.n_p)
 
-        for k, (i, j) in enumerate(
-            [(1, 0), (1, 2), (1, 3), (2, 0), (2, 3), (3, 0)],
-            start=cls.n_p,
-        ):
-            d = p_vecs[i] - p_vecs[j]
-            norm_d = np.linalg.norm(d)
-            first_order_der[k, i * cls.n_x : i * cls.n_x + cls.n_p] = d.T / norm_d
-            first_order_der[k, j * cls.n_x : j * cls.n_x + cls.n_p] = -d.T / norm_d
+        for k, (i, j) in enumerate([(1, 0), (2, 0), (3, 0)], start=1):
+            first_order_der[
+                cls.n_p * k : cls.n_p * (k + 1), i * cls.n_x : i * cls.n_x + cls.n_p
+            ] = np.eye(cls.n_p)
+            first_order_der[
+                cls.n_p * k : cls.n_p * (k + 1), j * cls.n_x : j * cls.n_x + cls.n_p
+            ] = -np.eye(cls.n_p)
 
         return first_order_der
 
     @classmethod
     def Hh(cls, x_vec):
-        second_order_der = np.zeros((cls.o, cls.n, cls.n))
-        p_vecs = [x_vec[i : i + cls.n_p] for i in range(0, cls.n, cls.n_x)]
-
-        for k, (i, j) in enumerate(
-            [(1, 0), (1, 2), (1, 3), (2, 0), (2, 3), (3, 0)],
-            start=cls.n_p,
-        ):
-            d = p_vecs[i] - p_vecs[j]
-            norm_d = np.linalg.norm(d)
-            hess_d = np.eye(cls.n_p) / norm_d - np.outer(d, d) / norm_d**3
-
-            second_order_der[
-                k,
-                i * cls.n_x : i * cls.n_x + cls.n_p,
-                i * cls.n_x : i * cls.n_x + cls.n_p,
-            ] = hess_d
-            second_order_der[
-                k,
-                i * cls.n_x : i * cls.n_x + cls.n_p,
-                j * cls.n_x : j * cls.n_x + cls.n_p,
-            ] = -hess_d
-            second_order_der[
-                k,
-                j * cls.n_x : j * cls.n_x + cls.n_p,
-                i * cls.n_x : i * cls.n_x + cls.n_p,
-            ] = -hess_d
-            second_order_der[
-                k,
-                j * cls.n_x : j * cls.n_x + cls.n_p,
-                j * cls.n_x : j * cls.n_x + cls.n_p,
-            ] = hess_d
-
-        return second_order_der.reshape((cls.o * cls.n, cls.n))
+        return np.zeros((cls.o * cls.n, cls.n))
