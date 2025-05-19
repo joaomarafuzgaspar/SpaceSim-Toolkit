@@ -74,7 +74,7 @@ def main():
             "approxA-newton",
             "mm-newton",
             "inewton",
-            "dr-newton",
+            "pcg-newton",
         ],
         help="""Orbit estimation algorithm framework:
         lm: Levenberg-Marquardt applied to the weighted nonlinear least squares problem;
@@ -87,7 +87,7 @@ def main():
         approxA-newton: Newton's method variant based on approximated Hessian (tree-structured Hessian + diagonal elements from the residual Hessian);
         mm-newton: Newton's method variant based on Majorization-Minimization for the cost function;
         inewton: Newton's method variant based on an iterative method to solve the linear system;
-        dr-newton: Newton's method variant based on Douglas-Rachford splitting.""",
+        pcg-newton: Newton's method variant based on Preconditioned Conjugate Gradient.""",
     )
     parser.add_argument(
         "-M",
