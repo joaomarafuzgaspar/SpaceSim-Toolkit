@@ -4,7 +4,7 @@
 - Simulate **spacecraft dynamics** with **high-fidelity** numerical propagator from [TUDAT](https://docs.tudat.space/en/latest/) using **Python**
 - Configure **spacecraft** and **multi-spacecraft missions** with easy-to-edit custom configuration files
 - Run and compare different legacy and advanced **estimation algorithms**
-- Visualize **orbits**, **ground tracks**, and **results** using Monte-Carlo analysis
+- Visualize **orbits** and **ground tracks** using MATLAB and **results** using Monte-Carlo analysis
 - Easy to implement estimation strategies in **high-level** Python language
 
 ## 🚀 Index
@@ -53,7 +53,7 @@ To run simulations, execute `python src/main.py` with the following command-line
 
 ### Available Estimation Algorithms (`-a`)
 - `lm`: Levenberg–Marquardt (nonlinear least squares)
-- `fcekf`: Fully centralized Extended Kalman Filter
+- `fcekf`: Fully centralized Extended Kalman Filter (EKF)
 - `hcmci`: Hybrid consensus on measurements and consensus on information [[2]](#ref-2)
 - `ccekf`: Consider Covariance EKF [[3]](#ref-3)
 - `newton`: Newton’s method
@@ -68,7 +68,7 @@ For detailed explanations of the Newton-based algorithms, refer to [[1]](#ref-1)
 
 ## 🦆 Examples
 ### Run propagation
-This command propagates the dynamics for the V-R3x mission formation and saves the evolution of the state vectors and Jacobians.
+This command propagates the dynamics for the V-R3x mission formation and saves the evolution of the state vectors.
 ```bash
 $ python src/main.py -f 1 -p
 ```
