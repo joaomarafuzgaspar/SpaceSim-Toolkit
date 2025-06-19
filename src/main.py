@@ -39,8 +39,8 @@ def main():
         "-c",
         "--config",
         type=str,
-        default="src/config.py",
-        help="Path to the configuration file to use (default: src/config.py)",
+        default="config_files/_config_default.py",
+        help="Path to the configuration file to use (default: config_files/_config_default.py)",
     )
     parser.add_argument(
         "-v",
