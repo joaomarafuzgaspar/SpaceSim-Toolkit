@@ -10,6 +10,7 @@ dependencies:
   - astropy
   - numpy<2.0.0
   - tqdm
+  - networkx
   - pip
   - pip:
     - astroquery>=0.4.8.dev9306

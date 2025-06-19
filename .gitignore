@@ -22,7 +22,7 @@ var/
 wheels/
 share/python-wheels/
 *.egg-info/
-.installed.cfg
+.installed.config
 *.egg
 MANIFEST
 
@@ -169,7 +169,12 @@ cython_debug/
 data/*.pkl
 data/*.csv
 data/*.mat
-data/cluster/
+data/kkt/
+data/newton_based/
+data/pic/
+data/using_tudat_and_Q_computed_at_the_moment/
+data/using_tudat_and_Q_diagonal_fixed/
+
 
 # Videos
 videos/

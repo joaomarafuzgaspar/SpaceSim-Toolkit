@@ -32,6 +32,14 @@ class UNKKT:
 
         self.dynamic_model = SatelliteDynamics()
 
+        # Define Newton parameters
+        self.grad_tol = 1e0
+        self.max_iter = 20
+        
+        # Store the cost function and gradient norm values
+        self.cost_function_values = []
+        self.grad_norm_values = []
+
     def h_function_chief(self, x_vec):
         """
         Compute the measurement vector for the chief satellite's position.
@@ -43,17 +51,6 @@ class UNKKT:
         np.array: Position components of the state vector.
         """
         return x_vec[0:3]
-
-    def H_jacobian_chief(self):
-        """
-        Compute the Jacobian of the measurement function for the chief satellite.
-
-        Returns:
-        np.array: Jacobian matrix for the chief satellite measurements.
-        """
-        H = np.zeros((3, 24))
-        H[0:3, 0:3] = np.eye(3)
-        return H
 
     def h_function_deputy(self, x_vec):
         """
@@ -88,43 +85,6 @@ class UNKKT:
             ]
         )
 
-    def H_jacobian_deputy(self, x_vec):
-        """
-        Compute the Jacobian of the measurement function for relative distances between satellites.
-
-        Parameters:
-        x_vec (np.array): Current state vector of all satellites.
-
-        Returns:
-        np.array: Jacobian matrix for relative distances.
-        """
-        r_chief = x_vec[:3]
-        r_deputy1 = x_vec[6:9]
-        r_deputy2 = x_vec[12:15]
-        r_deputy3 = x_vec[18:21]
-
-        range_deputy1_chief = np.linalg.norm(r_deputy1 - r_chief)
-        range_deputy1_deputy2 = np.linalg.norm(r_deputy1 - r_deputy2)
-        range_deputy1_deputy3 = np.linalg.norm(r_deputy1 - r_deputy3)
-        range_deputy2_chief = np.linalg.norm(r_deputy2 - r_chief)
-        range_deputy2_deputy3 = np.linalg.norm(r_deputy2 - r_deputy3)
-        range_deputy3_chief = np.linalg.norm(r_deputy3 - r_chief)
-
-        H = np.zeros((6, 24))
-        H[0, 0:3] = -(r_deputy1 - r_chief).reshape(-1) / range_deputy1_chief
-        H[0, 6:9] = (r_deputy1 - r_chief).reshape(-1) / range_deputy1_chief
-        H[1, 6:9] = (r_deputy1 - r_deputy2).reshape(-1) / range_deputy1_deputy2
-        H[1, 12:15] = -(r_deputy1 - r_deputy2).reshape(-1) / range_deputy1_deputy2
-        H[2, 6:9] = (r_deputy1 - r_deputy3).reshape(-1) / range_deputy1_deputy3
-        H[2, 18:21] = -(r_deputy1 - r_deputy3).reshape(-1) / range_deputy1_deputy3
-        H[3, 0:3] = -(r_deputy2 - r_chief).reshape(-1) / range_deputy2_chief
-        H[3, 12:15] = (r_deputy2 - r_chief).reshape(-1) / range_deputy2_chief
-        H[4, 12:15] = (r_deputy2 - r_deputy3).reshape(-1) / range_deputy2_deputy3
-        H[4, 18:21] = -(r_deputy2 - r_deputy3).reshape(-1) / range_deputy2_deputy3
-        H[5, 0:3] = -(r_deputy3 - r_chief).reshape(-1) / range_deputy3_chief
-        H[5, 18:21] = (r_deputy3 - r_chief).reshape(-1) / range_deputy3_chief
-        return H
-
     def h(self, x_vec):
         """
         Combine measurement functions for the chief and deputies.
@@ -138,18 +98,6 @@ class UNKKT:
         return np.concatenate(
             [self.h_function_chief(x_vec), self.h_function_deputy(x_vec)]
         )
-
-    def H(self, x_vec):
-        """
-        Combine Jacobians for both the chief and deputies.
-
-        Parameters:
-        x_vec (np.array): State vector of all satellites.
-
-        Returns:
-        np.array: Combined Jacobian matrix.
-        """
-        return np.concatenate((self.H_jacobian_chief(), self.H_jacobian_deputy(x_vec)))
 
     def obj_function(self, dt, x_0, y):
         """
@@ -214,7 +162,7 @@ class UNKKT:
                 x_3_k = self.dynamic_model.x_new(dt, x_3_k)
                 x_4_k = self.dynamic_model.x_new(dt, x_4_k)
 
-        return f_x_0
+        return f_x_0 / self.W
 
     def grad_obj_function(self, dt, x_0, y):
         """
@@ -308,7 +256,7 @@ class UNKKT:
                 STM_t0_3 = STM_t0_3 @ STM_t0_3_old
                 STM_t0_4 = STM_t0_4 @ STM_t0_4_old
 
-        return grad_f_x_0
+        return grad_f_x_0 / self.W
 
     def hessian_obj_function(self, dt, x_0, y):
         """
@@ -459,7 +407,7 @@ class UNKKT:
                 STM_t0_3 = STM_t0_3 @ STM_t0_3_old
                 STM_t0_4 = STM_t0_4 @ STM_t0_4_old
 
-        return hessian_f_x_0
+        return hessian_f_x_0 / self.W
 
     def lagrangian(self, dt, X, Y):
         """
@@ -516,10 +464,8 @@ class UNKKT:
         np.array: Optimized state vector for the sliding window.
         """
         n_x = 6
-        tolerance = 1e0
-        max_iter = 20
         x = x_init
-        for iteration in range(max_iter):
+        for iteration in range(self.max_iter):
             # Compute the cost function, gradient of the Lagrangian and Hessian of the Lagrangian
             L_x = self.lagrangian(dt, x, Y)
             grad_L_x = self.grad_lagrangian(dt, x, Y)
@@ -528,9 +474,13 @@ class UNKKT:
             # Calculate norms for convergence tracking
             L_norm = np.linalg.norm(L_x)
             grad_L_norm = np.linalg.norm(grad_L_x)
+            
+            # Store the norms
+            self.cost_function_values.append(L_x[0][0])
+            self.grad_norm_values.append(grad_L_norm)
 
             # Check convergence and print metrics
-            if grad_L_norm < tolerance or iteration + 1 == max_iter:
+            if grad_L_norm < self.grad_tol or iteration + 1 == self.max_iter:
                 print(
                     f"STOP on Iteration {iteration}\nL_norm = {L_norm}\nGrad_L_norm = {grad_L_norm}\n"
                 )

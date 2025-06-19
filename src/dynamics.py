@@ -1,6 +1,22 @@
 import numpy as np
 
 from earth import Earth, AtmosphericModel
+from config import SimulationConfig as config
+
+# Load tudatpy modules
+try:
+    from tudatpy.interface import spice
+    from tudatpy.util import result2array
+    from tudatpy import numerical_simulation
+    from tudatpy.numerical_simulation import (
+        environment_setup,
+        propagation_setup,
+        estimation_setup,
+    )
+
+    TUDATPY_AVAILABLE = True
+except ModuleNotFoundError:
+    TUDATPY_AVAILABLE = False
 
 
 def rotation_matrix_x(alpha):
@@ -150,6 +166,18 @@ def rv2coe(rv_geocentric_equatorial_vec):
     )
 
 
+def rv2mean_argument_of_latitude(rv_geocentric_equatorial_vec):
+    _, eccentricity, _, argument_of_periapsis, _, true_anomaly = rv2coe(
+        rv_geocentric_equatorial_vec
+    )
+    eccentric_anomaly = 2 * np.arctan(
+        np.sqrt((1 - eccentricity) / (1 + eccentricity)) * np.tan(true_anomaly / 2)
+    )
+    mean_anomaly = eccentric_anomaly - eccentricity * np.sin(eccentric_anomaly)
+    mean_argument_of_latitude = mean_anomaly + argument_of_periapsis
+    return mean_argument_of_latitude
+
+
 class SatelliteDynamics:
     """
     This class models the dynamics of a satellite in a LEO orbit.
@@ -160,7 +188,7 @@ class SatelliteDynamics:
         """
         Initialize satellite parameters.
         """
-        self.C_drag = 2.22  # Drag coefficient
+        self.C_drag = 2.2  # Drag coefficient
         self.A_drag = 0.01  # Drag area [m^2]
         self.m = 1.0  # Mass [kg]
 
@@ -433,3 +461,812 @@ class SatelliteDynamics:
         Phi = np.eye(len(x_old)) + dt / 6 * (K1 + 2 * K2 + 2 * K3 + K4)
 
         return Phi
+
+
+class Propagator:
+    def __init__(
+        self,
+        simulation_start_epoch,
+        simulation_end_epoch,
+        fixed_step_size,
+        initial_conditions,
+    ):
+        # Load SPICE kernels
+        spice.load_standard_kernels()
+
+        # Create default body settings
+        bodies_to_create = ["Sun", "Moon", "Venus", "Earth", "Mars", "Jupiter"]
+
+        # Create default body settings for bodies_to_create, with "Earth"/"J2000" as the global frame origin and orientation
+        global_frame_origin = "Earth"
+        global_frame_orientation = "J2000"
+        body_settings = environment_setup.get_default_body_settings(
+            bodies_to_create, global_frame_origin, global_frame_orientation
+        )
+        body_settings.get("Earth").atmosphere_settings = (
+            environment_setup.atmosphere.nrlmsise00()
+        )
+
+        # Create system of bodies
+        bodies = environment_setup.create_system_of_bodies(body_settings)
+
+        # Add satellite bodies to the system and set their mass
+        mass = config.mass
+        spacecrafts = ["Chief", "Deputy1", "Deputy2", "Deputy3"]
+        for spacecraft in spacecrafts:
+            bodies.create_empty_body(spacecraft)
+            bodies.get(spacecraft).mass = mass
+
+        # Add the aerodynamic interface to the environment
+        reference_area = config.A_drag
+        drag_coefficient = config.C_drag
+        aero_coefficient_settings = environment_setup.aerodynamic_coefficients.constant(
+            reference_area, [drag_coefficient, 0.0, 0.0]
+        )
+        for spacecraft in spacecrafts:
+            environment_setup.add_aerodynamic_coefficient_interface(
+                bodies, spacecraft, aero_coefficient_settings
+            )
+
+        # Define radiation pressure settings
+        reference_area_radiation = config.A_SRP
+        radiation_pressure_coefficient = config.C_SRP
+        occulting_bodies_dict = dict()
+        occulting_bodies_dict["Sun"] = ["Earth"]
+
+        # Create and add the radiation pressure interface to the environment
+        radiation_pressure_settings = environment_setup.radiation_pressure.cannonball(
+            "Sun",
+            reference_area_radiation,
+            radiation_pressure_coefficient,
+            occulting_bodies=occulting_bodies_dict["Sun"],
+        )
+        for spacecraft in spacecrafts:
+            environment_setup.add_radiation_pressure_interface(
+                bodies, spacecraft, radiation_pressure_settings
+            )
+
+        # Define accelerations acting on each vehicle
+        #   1. Earth’s gravity field EGM96 spherical harmonic expansion up to degree and order 24
+        #   2. Atmospheric drag NRLMSISE-00 model
+        #   3. Cannon ball solar radiation pressure, assuming constant reflectivity coefficient and radiation area
+        #   4. Third-body perturbations of the Sun, Moon, Venus, Mars and Jupiter
+        accelerations_settings = dict(
+            Sun=[
+                propagation_setup.acceleration.point_mass_gravity(),
+                propagation_setup.acceleration.cannonball_radiation_pressure(),
+            ],
+            Moon=[propagation_setup.acceleration.point_mass_gravity()],
+            Venus=[propagation_setup.acceleration.point_mass_gravity()],
+            Earth=[
+                propagation_setup.acceleration.spherical_harmonic_gravity(24, 24),
+                propagation_setup.acceleration.aerodynamic(),
+            ],
+            Mars=[propagation_setup.acceleration.point_mass_gravity()],
+            Jupiter=[propagation_setup.acceleration.point_mass_gravity()],
+        )
+        acceleration_settings = {}
+        bodies_to_propagate = []
+        central_bodies = []
+        for spacecraft in spacecrafts:
+            acceleration_settings[spacecraft] = accelerations_settings
+            bodies_to_propagate.append(spacecraft)
+            central_bodies.append("Earth")
+
+        # Create acceleration models
+        acceleration_models = propagation_setup.create_acceleration_models(
+            bodies, acceleration_settings, bodies_to_propagate, central_bodies
+        )
+
+        # Create numerical integrator settings
+        integrator_settings = propagation_setup.integrator.runge_kutta_4(
+            fixed_step_size
+        )
+
+        # Create termination settings
+        termination_condition = propagation_setup.propagator.time_termination(
+            simulation_end_epoch
+        )
+
+        # Create propagation settings
+        propagator_settings = propagation_setup.propagator.translational(
+            central_bodies,
+            acceleration_models,
+            bodies_to_propagate,
+            initial_conditions,
+            simulation_start_epoch,
+            integrator_settings,
+            termination_condition,
+        )
+
+        # Setup parameters settings to propagate the state transition matrix
+        parameter_settings = estimation_setup.parameter.initial_states(
+            propagator_settings, bodies
+        )
+
+        # Create the parameters that will be estimated
+        parameters_to_estimate = estimation_setup.create_parameter_set(
+            parameter_settings, bodies
+        )
+
+        # Create the variational equation solver and propagate the dynamics
+        self.variational_equations_solver = (
+            numerical_simulation.create_variational_equations_solver(
+                bodies,
+                propagator_settings,
+                parameters_to_estimate,
+                simulate_dynamics_on_creation=True,
+            )
+        )
+
+    def run(self):
+        # Extract the resulting state history
+        states = self.variational_equations_solver.state_history
+        states = result2array(states)[:, 1:]
+
+        return states
+
+
+class Dynamics:
+    def __init__(self):
+        self.earth = Earth()
+        self.atm = AtmosphericModel()
+
+    def a_grav(self, x_vec):
+        p_vec = x_vec[:3]
+        p_norm = np.linalg.norm(p_vec)
+        return -self.earth.mu * p_vec / p_norm**3
+
+    def da_grav_dp_vec(self, x_vec):
+        p_vec = x_vec[:3]
+        p_norm = np.linalg.norm(p_vec)
+        return -self.earth.mu * (
+            np.eye(config.n_p) / p_norm**3 - 3 * np.outer(p_vec, p_vec) / p_norm**5
+        )
+
+    def d2a_grav_dp_vec_dp_vecT(self, x_vec):
+        p_vec = x_vec[:3]
+        p_norm = np.linalg.norm(p_vec)
+        term1_der = -3 / p_norm**5 * np.kron(np.eye(config.n_p), p_vec)
+        term2_der = 1 / p_norm**5 * (
+            np.kron(np.eye(config.n_p).reshape(-1, 1), p_vec.T)
+            + np.kron(p_vec, np.eye(config.n_p))
+        ) - 5 / p_norm**7 * np.kron(p_vec, np.outer(p_vec, p_vec))
+        return -self.earth.mu * (term1_der - 3 * term2_der)
+
+    def a_J2(self, x_vec):
+        p_vec = x_vec[:3]
+        x, y, z = p_vec
+        p_norm = np.linalg.norm(p_vec)
+        return (
+            -3
+            * self.earth.J_2
+            * self.earth.mu
+            * self.earth.R**2
+            / (2 * p_norm**5)
+            * np.array(
+                [
+                    (1 - 5 * z**2 / p_norm**2) * x,
+                    (1 - 5 * z**2 / p_norm**2) * y,
+                    (3 - 5 * z**2 / p_norm**2) * z,
+                ]
+            )
+        )
+
+    def da_J2_dp_vec(self, x_vec):
+        p_vec = x_vec[:3]
+        x, y, z = p_vec
+        p_norm = np.linalg.norm(p_vec)
+        result = (
+            -3
+            * self.earth.J_2
+            * self.earth.mu
+            * self.earth.R**2
+            / (2 * p_norm**9)
+            * np.array(
+                [
+                    [
+                        -4 * x**4
+                        - 3 * x**2 * y**2
+                        + 27 * x**2 * z**2
+                        + y**4
+                        - 3 * y**2 * z**2
+                        - 4 * z**4,
+                        -5 * x**3 * y - 5 * x * y**3 + 30 * x * y * z**2,
+                        -15 * x**3 * z - 15 * x * y**2 * z + 20 * x * z**3,
+                    ],
+                    [
+                        -5 * x**3 * y - 5 * x * y**3 + 30 * x * y * z**2,
+                        x**4
+                        - 3 * x**2 * y**2
+                        - 3 * x**2 * z**2
+                        - 4 * y**4
+                        + 27 * y**2 * z**2
+                        - 4 * z**4,
+                        -15 * x**2 * y * z - 15 * y**3 * z + 20 * y * z**3,
+                    ],
+                    [
+                        -15 * x**3 * z - 15 * x * y**2 * z + 20 * x * z**3,
+                        -15 * x**2 * y * z - 15 * y**3 * z + 20 * y * z**3,
+                        3 * x**4
+                        + 6 * x**2 * y**2
+                        - 24 * x**2 * z**2
+                        + 3 * y**4
+                        - 24 * y**2 * z**2
+                        + 8 * z**4,
+                    ],
+                ]
+            )
+        )
+        return np.squeeze(result)
+
+    def d2a_J2_dp_vec_dp_vecT(self, x_vec):
+        p_vec = x_vec[:3]
+        x, y, z = p_vec
+        p_norm = np.linalg.norm(p_vec)
+        result = (
+            -3
+            * self.earth.J_2
+            * self.earth.mu
+            * self.earth.R**2
+            / (2 * p_norm**11)
+            * np.array(
+                [
+                    [
+                        20 * x**5
+                        + 5 * x**3 * y**2
+                        - 205 * x**3 * z**2
+                        - 15 * x * y**4
+                        + 75 * x * y**2 * z**2
+                        + 90 * x * z**4,
+                        30 * x**4 * y
+                        + 25 * x**2 * y**3
+                        - 255 * x**2 * y * z**2
+                        - 5 * y**5
+                        + 25 * y**3 * z**2
+                        + 30 * y * z**4,
+                        90 * x**4 * z
+                        + 75 * x**2 * y**2 * z
+                        - 205 * x**2 * z**3
+                        - 15 * y**4 * z
+                        + 5 * y**2 * z**3
+                        + 20 * z**5,
+                    ],
+                    [
+                        30 * x**4 * y
+                        + 25 * x**2 * y**3
+                        - 255 * x**2 * y * z**2
+                        - 5 * y**5
+                        + 25 * y**3 * z**2
+                        + 30 * y * z**4,
+                        -5 * x**5
+                        + 25 * x**3 * y**2
+                        + 25 * x**3 * z**2
+                        + 30 * x * y**4
+                        - 255 * x * y**2 * z**2
+                        + 30 * x * z**4,
+                        105 * x**3 * y * z + 105 * x * y**3 * z - 210 * x * y * z**3,
+                    ],
+                    [
+                        90 * x**4 * z
+                        + 75 * x**2 * y**2 * z
+                        - 205 * x**2 * z**3
+                        - 15 * y**4 * z
+                        + 5 * y**2 * z**3
+                        + 20 * z**5,
+                        105 * x**3 * y * z + 105 * x * y**3 * z - 210 * x * y * z**3,
+                        -15 * x**5
+                        - 30 * x**3 * y**2
+                        + 180 * x**3 * z**2
+                        - 15 * x * y**4
+                        + 180 * x * y**2 * z**2
+                        - 120 * x * z**4,
+                    ],
+                    [
+                        30 * x**4 * y
+                        + 25 * x**2 * y**3
+                        - 255 * x**2 * y * z**2
+                        - 5 * y**5
+                        + 25 * y**3 * z**2
+                        + 30 * y * z**4,
+                        -5 * x**5
+                        + 25 * x**3 * y**2
+                        + 25 * x**3 * z**2
+                        + 30 * x * y**4
+                        - 255 * x * y**2 * z**2
+                        + 30 * x * z**4,
+                        105 * x**3 * y * z + 105 * x * y**3 * z - 210 * x * y * z**3,
+                    ],
+                    [
+                        -5 * x**5
+                        + 25 * x**3 * y**2
+                        + 25 * x**3 * z**2
+                        + 30 * x * y**4
+                        - 255 * x * y**2 * z**2
+                        + 30 * x * z**4,
+                        -15 * x**4 * y
+                        + 5 * x**2 * y**3
+                        + 75 * x**2 * y * z**2
+                        + 20 * y**5
+                        - 205 * y**3 * z**2
+                        + 90 * y * z**4,
+                        -15 * x**4 * z
+                        + 75 * x**2 * y**2 * z
+                        + 5 * x**2 * z**3
+                        + 90 * y**4 * z
+                        - 205 * y**2 * z**3
+                        + 20 * z**5,
+                    ],
+                    [
+                        105 * x**3 * y * z + 105 * x * y**3 * z - 210 * x * y * z**3,
+                        -15 * x**4 * z
+                        + 75 * x**2 * y**2 * z
+                        + 5 * x**2 * z**3
+                        + 90 * y**4 * z
+                        - 205 * y**2 * z**3
+                        + 20 * z**5,
+                        -15 * x**4 * y
+                        - 30 * x**2 * y**3
+                        + 180 * x**2 * y * z**2
+                        - 15 * y**5
+                        + 180 * y**3 * z**2
+                        - 120 * y * z**4,
+                    ],
+                    [
+                        90 * x**4 * z
+                        + 75 * x**2 * y**2 * z
+                        - 205 * x**2 * z**3
+                        - 15 * y**4 * z
+                        + 5 * y**2 * z**3
+                        + 20 * z**5,
+                        105 * x**3 * y * z + 105 * x * y**3 * z - 210 * x * y * z**3,
+                        -15 * x**5
+                        - 30 * x**3 * y**2
+                        + 180 * x**3 * z**2
+                        - 15 * x * y**4
+                        + 180 * x * y**2 * z**2
+                        - 120 * x * z**4,
+                    ],
+                    [
+                        105 * x**3 * y * z + 105 * x * y**3 * z - 210 * x * y * z**3,
+                        -15 * x**4 * z
+                        + 75 * x**2 * y**2 * z
+                        + 5 * x**2 * z**3
+                        + 90 * y**4 * z
+                        - 205 * y**2 * z**3
+                        + 20 * z**5,
+                        -15 * x**4 * y
+                        - 30 * x**2 * y**3
+                        + 180 * x**2 * y * z**2
+                        - 15 * y**5
+                        + 180 * y**3 * z**2
+                        - 120 * y * z**4,
+                    ],
+                    [
+                        -15 * x**5
+                        - 30 * x**3 * y**2
+                        + 180 * x**3 * z**2
+                        - 15 * x * y**4
+                        + 180 * x * y**2 * z**2
+                        - 120 * x * z**4,
+                        -15 * x**4 * y
+                        - 30 * x**2 * y**3
+                        + 180 * x**2 * y * z**2
+                        - 15 * y**5
+                        + 180 * y**3 * z**2
+                        - 120 * y * z**4,
+                        -75 * x**4 * z
+                        - 150 * x**2 * y**2 * z
+                        + 200 * x**2 * z**3
+                        - 75 * y**4 * z
+                        + 200 * y**2 * z**3
+                        - 40 * z**5,
+                    ],
+                ]
+            )
+        )
+
+        return np.squeeze(result)
+
+    def a_drag(self, x_vec):
+        p_vec = x_vec[:3]
+        v_vec = x_vec[3:]
+        p_norm = np.linalg.norm(p_vec)
+        h = p_norm - self.earth.R
+        rho = self.atm.get_rho(h)
+        omega_vec = np.array([[0], [0], [self.earth.omega]])
+        v_vec_rel = v_vec - np.cross(
+            omega_vec.reshape(
+                3,
+            ),
+            p_vec.reshape(
+                3,
+            ),
+        ).reshape(3, 1)
+        v_rel_norm = np.linalg.norm(v_vec_rel)
+        return (
+            -1
+            / 2
+            * config.C_drag
+            * config.A_drag
+            / config.mass
+            * rho
+            * v_rel_norm
+            * v_vec_rel
+        )
+
+    def da_drag_dp_vec(self, x_vec):
+        p_vec = x_vec[:3]
+        v_vec = x_vec[3:]
+        p_norm = np.linalg.norm(p_vec)
+        h = p_norm - self.earth.R
+        rho = self.atm.get_rho(h)
+        omega_vec = np.array([[0], [0], [self.earth.omega]])
+        v_vec_rel = v_vec - np.cross(
+            omega_vec.reshape(
+                3,
+            ),
+            p_vec.reshape(
+                3,
+            ),
+        ).reshape(3, 1)
+        v_rel_norm = np.linalg.norm(v_vec_rel)
+        drho_dp_vec = -rho / self.atm.get_H(h) * p_vec / p_norm
+        dv_vec_rel_dp_vec = np.array(
+            [[0, self.earth.omega, 0], [-self.earth.omega, 0, 0], [0, 0, 0]]
+        )
+        return (
+            -1
+            / 2
+            * config.C_drag
+            * config.A_drag
+            / config.mass
+            * (
+                rho
+                * (v_rel_norm * np.eye(3) + v_vec_rel * v_vec_rel.T / v_rel_norm)
+                @ dv_vec_rel_dp_vec
+                + v_rel_norm * v_vec_rel * drho_dp_vec.T
+            )
+        )
+
+    def da_drag_dv_vec(self, x_vec):
+        p_vec = x_vec[:3]
+        v_vec = x_vec[3:]
+        p_norm = np.linalg.norm(p_vec)
+        h = p_norm - self.earth.R
+        rho = self.atm.get_rho(h)
+        omega_vec = np.array([[0], [0], [self.earth.omega]])
+        v_vec_rel = v_vec - np.cross(
+            omega_vec.reshape(
+                3,
+            ),
+            p_vec.reshape(
+                3,
+            ),
+        ).reshape(3, 1)
+        v_rel_norm = np.linalg.norm(v_vec_rel)
+        return (
+            -1
+            / 2
+            * config.C_drag
+            * config.A_drag
+            / config.mass
+            * rho
+            * (v_rel_norm * np.eye(3) + v_vec_rel * v_vec_rel.T / v_rel_norm)
+        )
+
+    def d2a_drag_dp_vec_dp_vecT(self, x_vec):
+        p_vec = x_vec[:3]
+        v_vec = x_vec[3:]
+        p_norm = np.linalg.norm(p_vec)
+        h = p_norm - self.earth.R
+        rho = self.atm.get_rho(h)
+        H = self.atm.get_H(h)
+        omega_vec = np.array([[0], [0], [self.earth.omega]])
+        v_vec_rel = v_vec - np.cross(
+            omega_vec.reshape(
+                3,
+            ),
+            p_vec.reshape(
+                3,
+            ),
+        ).reshape(3, 1)
+        v_rel_norm = np.linalg.norm(v_vec_rel)
+        drho_dp_vec = -rho / H * p_vec / p_norm
+        d2rho_dp_vec2 = rho / H**2 * p_vec * p_vec.T / p_norm**2 - rho / H * (
+            np.eye(3) / p_norm - p_vec * p_vec.T / p_norm**3
+        )
+        dv_vec_rel_dp_vec = np.array(
+            [[0, self.earth.omega, 0], [-self.earth.omega, 0, 0], [0, 0, 0]]
+        )
+        term11 = (
+            rho
+            * np.kron(np.eye(3), dv_vec_rel_dp_vec).T
+            @ (
+                1
+                / v_rel_norm
+                * (
+                    np.kron(np.eye(3), v_vec_rel)
+                    + np.kron(np.eye(3).reshape(-1, 1), v_vec_rel.T)
+                    + np.kron(v_vec_rel, np.eye(3))
+                )
+                - 1 / v_rel_norm**3 * np.kron(v_vec_rel, np.outer(v_vec_rel, v_vec_rel))
+            )
+            @ dv_vec_rel_dp_vec
+        )
+        term12 = np.kron(np.eye(3), drho_dp_vec) @ (
+            (v_rel_norm * np.eye(3) + v_vec_rel * v_vec_rel.T / v_rel_norm)
+            @ dv_vec_rel_dp_vec
+        )
+        term1 = term11 + term12
+        term21 = np.kron(
+            (
+                (v_rel_norm * np.eye(3) + v_vec_rel * v_vec_rel.T / v_rel_norm)
+                @ dv_vec_rel_dp_vec
+            ).reshape(-1, 1),
+            drho_dp_vec.T,
+        )
+        term22 = np.kron(v_rel_norm * v_vec_rel, np.eye(3)) @ d2rho_dp_vec2
+        term2 = term21 + term22
+        return -1 / 2 * config.C_drag * config.A_drag / config.mass * (term1 + term2)
+
+    def d2a_drag_dv_vec_dp_vecT(self, x_vec):
+        p_vec = x_vec[:3]
+        v_vec = x_vec[3:]
+        p_norm = np.linalg.norm(p_vec)
+        h = p_norm - self.earth.R
+        rho = self.atm.get_rho(h)
+        omega_vec = np.array([[0], [0], [self.earth.omega]])
+        v_vec_rel = v_vec - np.cross(
+            omega_vec.reshape(
+                3,
+            ),
+            p_vec.reshape(
+                3,
+            ),
+        ).reshape(3, 1)
+        v_rel_norm = np.linalg.norm(v_vec_rel)
+        drho_dp_vec = -rho / self.atm.get_H(h) * p_vec / p_norm
+        dv_vec_rel_dp_vec = np.array(
+            [[0, self.earth.omega, 0], [-self.earth.omega, 0, 0], [0, 0, 0]]
+        )
+        term1 = (
+            rho
+            * (
+                1
+                / v_rel_norm
+                * (
+                    np.kron(np.eye(3), v_vec_rel)
+                    + np.kron(np.eye(3).reshape(-1, 1), v_vec_rel.T)
+                    + np.kron(v_vec_rel, np.eye(3))
+                )
+                - 1 / v_rel_norm**3 * np.kron(v_vec_rel, np.outer(v_vec_rel, v_vec_rel))
+            )
+            @ dv_vec_rel_dp_vec
+        )
+        term2 = np.kron(
+            (v_rel_norm * np.eye(3) + v_vec_rel * v_vec_rel.T / v_rel_norm).reshape(
+                -1, 1
+            ),
+            drho_dp_vec.T,
+        )
+        return -1 / 2 * config.C_drag * config.A_drag / config.mass * (term1 + term2)
+
+    def d2a_drag_dp_vec_dv_vecT(self, x_vec):
+        p_vec = x_vec[:3]
+        v_vec = x_vec[3:]
+        p_norm = np.linalg.norm(p_vec)
+        h = p_norm - self.earth.R
+        rho = self.atm.get_rho(h)
+        omega_vec = np.array([[0], [0], [self.earth.omega]])
+        v_vec_rel = v_vec - np.cross(
+            omega_vec.reshape(
+                3,
+            ),
+            p_vec.reshape(
+                3,
+            ),
+        ).reshape(3, 1)
+        v_rel_norm = np.linalg.norm(v_vec_rel)
+        drho_dp_vec = -rho / self.atm.get_H(h) * p_vec / p_norm
+        dv_vec_rel_dp_vec = np.array(
+            [[0, self.earth.omega, 0], [-self.earth.omega, 0, 0], [0, 0, 0]]
+        )
+        term1 = (
+            rho
+            * np.kron(np.eye(3), dv_vec_rel_dp_vec).T
+            @ (
+                1
+                / v_rel_norm
+                * (
+                    np.kron(np.eye(3), v_vec_rel)
+                    + np.kron(np.eye(3).reshape(-1, 1), v_vec_rel.T)
+                    + np.kron(v_vec_rel, np.eye(3))
+                )
+                - 1 / v_rel_norm**3 * np.kron(v_vec_rel, np.outer(v_vec_rel, v_vec_rel))
+            )
+        )
+        term2 = np.kron(np.eye(3), drho_dp_vec) @ (
+            v_rel_norm * np.eye(3) + v_vec_rel * v_vec_rel.T / v_rel_norm
+        )
+        return -1 / 2 * config.C_drag * config.A_drag / config.mass * (term1 + term2)
+
+    def d2a_drag_dv_vec_dv_vecT(self, x_vec):
+        p_vec = x_vec[:3]
+        v_vec = x_vec[3:]
+        p_norm = np.linalg.norm(p_vec)
+        h = p_norm - self.earth.R
+        rho = self.atm.get_rho(h)
+        omega_vec = np.array([[0], [0], [self.earth.omega]])
+        v_vec_rel = v_vec - np.cross(
+            omega_vec.reshape(
+                3,
+            ),
+            p_vec.reshape(
+                3,
+            ),
+        ).reshape(3, 1)
+        v_rel_norm = np.linalg.norm(v_vec_rel)
+        return (
+            -1
+            / 2
+            * config.C_drag
+            * config.A_drag
+            / config.mass
+            * rho
+            * (
+                1
+                / v_rel_norm
+                * (
+                    np.kron(np.eye(3), v_vec_rel)
+                    + np.kron(np.eye(3).reshape(-1, 1), v_vec_rel.T)
+                    + np.kron(v_vec_rel, np.eye(3))
+                )
+                - 1 / v_rel_norm**3 * np.kron(v_vec_rel, np.outer(v_vec_rel, v_vec_rel))
+            )
+        )
+
+    def diff_eq(self, x_vec):
+        x_dot_vec = np.zeros_like(x_vec)
+        for i in range(int(x_vec.shape[0] / config.n_x)):
+            x_vec_i = x_vec[i * config.n_x : i * config.n_x + config.n_x]
+            v_vec_i = x_vec_i[config.n_p : config.n_x]
+            x_dot_vec[i * config.n_x : i * config.n_x + config.n_x] = np.concatenate(
+                (
+                    v_vec_i,
+                    self.a_grav(x_vec_i) + self.a_J2(x_vec_i) + self.a_drag(x_vec_i),
+                )
+            )
+        return x_dot_vec
+
+    def Ddiff_eq(self, x_vec):
+        first_order_der = np.zeros((config.n, config.n))
+        for i in range(int(x_vec.shape[0] / config.n_x)):
+            x_vec_i = x_vec[i * config.n_x : i * config.n_x + config.n_x]
+            first_order_der[
+                i * config.n_x : i * config.n_x + config.n_p,
+                i * config.n_x + config.n_p : i * config.n_x + config.n_x,
+            ] = np.eye(config.n_p)
+            first_order_der[
+                i * config.n_x + config.n_p : i * config.n_x + config.n_x,
+                i * config.n_x : i * config.n_x + config.n_p,
+            ] = (
+                self.da_grav_dp_vec(x_vec_i)
+                + self.da_J2_dp_vec(x_vec_i)
+                + self.da_drag_dp_vec(x_vec_i)
+            )
+            first_order_der[
+                i * config.n_x + config.n_p : i * config.n_x + config.n_x,
+                i * config.n_x + config.n_p : i * config.n_x + config.n_x,
+            ] = self.da_drag_dv_vec(x_vec_i)
+        return first_order_der
+
+    def Hdiff_eq(self, x_vec):
+        second_order_der = np.zeros((config.n, config.n, config.n))
+        for i in range(int(x_vec.shape[0] / config.n_x)):
+            x_vec_i = x_vec[i * config.n_x : i * config.n_x + config.n_x]
+            aux_pp = (
+                self.d2a_grav_dp_vec_dp_vecT(x_vec_i)
+                + self.d2a_J2_dp_vec_dp_vecT(x_vec_i)
+                + self.d2a_drag_dp_vec_dp_vecT(x_vec_i)
+            ).reshape((config.n_p, config.n_p, config.n_p))
+            aux_pv = self.d2a_drag_dp_vec_dv_vecT(x_vec_i).reshape(
+                (config.n_p, config.n_p, config.n_p)
+            )
+            aux_vp = self.d2a_drag_dv_vec_dp_vecT(x_vec_i).reshape(
+                (config.n_p, config.n_p, config.n_p)
+            )
+            aux_vv = self.d2a_drag_dv_vec_dv_vecT(x_vec_i).reshape(
+                (config.n_p, config.n_p, config.n_p)
+            )
+            for j in range(config.n_p):
+                second_order_der[
+                    i * config.n_x + config.n_p : i * config.n_x + config.n_x,
+                    i * config.n_x : i * config.n_x + config.n_p,
+                    i * config.n_x + j,
+                ] = aux_pp[:, :, j]
+                second_order_der[
+                    i * config.n_x + config.n_p : i * config.n_x + config.n_x,
+                    i * config.n_x : i * config.n_x + config.n_p,
+                    i * config.n_x + j + config.n_p,
+                ] = aux_pv[:, :, j]
+                second_order_der[
+                    i * config.n_x + config.n_p : i * config.n_x + config.n_x,
+                    i * config.n_x + config.n_p : i * config.n_x + config.n_x,
+                    i * config.n_x + j,
+                ] = aux_vp[:, :, j]
+                second_order_der[
+                    i * config.n_x + config.n_p : i * config.n_x + config.n_x,
+                    i * config.n_x + config.n_p : i * config.n_x + config.n_x,
+                    i * config.n_x + j + config.n_p,
+                ] = aux_vv[:, :, j]
+        return second_order_der.reshape((config.n * config.n, config.n))
+
+    def f(self, dt, x_old):
+        k1 = self.diff_eq(x_old)
+        k2 = self.diff_eq(x_old + dt / 2 * k1)
+        k3 = self.diff_eq(x_old + dt / 2 * k2)
+        k4 = self.diff_eq(x_old + dt * k3)
+        return x_old + dt / 6 * (k1 + 2 * k2 + 2 * k3 + k4)
+
+    def Df(self, dt, x_old):
+        k1 = self.diff_eq(x_old)
+        k2 = self.diff_eq(x_old + dt / 2 * k1)
+        k3 = self.diff_eq(x_old + dt / 2 * k2)
+
+        Dk1 = self.Ddiff_eq(x_old)
+        Dk2 = self.Ddiff_eq(x_old + dt / 2 * k1) @ (np.eye(config.n) + dt / 2 * Dk1)
+        Dk3 = self.Ddiff_eq(x_old + dt / 2 * k2) @ (np.eye(config.n) + dt / 2 * Dk2)
+        Dk4 = self.Ddiff_eq(x_old + dt * k3) @ (np.eye(config.n) + dt * Dk3)
+        return np.eye(config.n) + dt / 6 * (Dk1 + 2 * Dk2 + 2 * Dk3 + Dk4)
+
+    def f_and_Df(self, dt, x_old):  # more efficient
+        k1 = self.diff_eq(x_old)
+        k2 = self.diff_eq(x_old + dt / 2 * k1)
+        k3 = self.diff_eq(x_old + dt / 2 * k2)
+        k4 = self.diff_eq(x_old + dt * k3)
+
+        Dk1 = self.Ddiff_eq(x_old)
+        Dk2 = self.Ddiff_eq(x_old + dt / 2 * k1) @ (np.eye(config.n) + dt / 2 * Dk1)
+        Dk3 = self.Ddiff_eq(x_old + dt / 2 * k2) @ (np.eye(config.n) + dt / 2 * Dk2)
+        Dk4 = self.Ddiff_eq(x_old + dt * k3) @ (np.eye(config.n) + dt * Dk3)
+        return x_old + dt / 6 * (k1 + 2 * k2 + 2 * k3 + k4), np.eye(
+            config.n
+        ) + dt / 6 * (Dk1 + 2 * Dk2 + 2 * Dk3 + Dk4)
+
+    def Hf(self, dt, x_old):
+        k1 = self.diff_eq(x_old)
+        k2 = self.diff_eq(x_old + dt / 2 * k1)
+        k3 = self.diff_eq(x_old + dt / 2 * k2)
+
+        Dk1 = self.Ddiff_eq(x_old)
+        Dk2 = self.Ddiff_eq(x_old + dt / 2 * k1) @ (np.eye(config.n) + dt / 2 * Dk1)
+        Dk3 = self.Ddiff_eq(x_old + dt / 2 * k2) @ (np.eye(config.n) + dt / 2 * Dk2)
+
+        Hk1 = self.Hdiff_eq(x_old)
+        Hk2 = np.kron(
+            np.eye(config.n), np.eye(config.n) + dt / 2 * Dk1
+        ).T @ self.Hdiff_eq(x_old + dt / 2 * k1) @ (
+            np.eye(config.n) + dt / 2 * Dk1
+        ) + np.kron(
+            self.Ddiff_eq(x_old + dt / 2 * k1), np.eye(config.n)
+        ) @ (
+            dt / 2 * Hk1
+        )
+        Hk3 = np.kron(
+            np.eye(config.n), np.eye(config.n) + dt / 2 * Dk2
+        ).T @ self.Hdiff_eq(x_old + dt / 2 * k2) @ (
+            np.eye(config.n) + dt / 2 * Dk2
+        ) + np.kron(
+            self.Ddiff_eq(x_old + dt / 2 * k2), np.eye(config.n)
+        ) @ (
+            dt / 2 * Hk2
+        )
+        Hk4 = np.kron(np.eye(config.n), np.eye(config.n) + dt * Dk3).T @ self.Hdiff_eq(
+            x_old + dt * k3
+        ) @ (np.eye(config.n) + dt * Dk3) + np.kron(
+            self.Ddiff_eq(x_old + dt * k3), np.eye(config.n)
+        ) @ (
+            dt * Hk3
+        )
+        return dt / 6 * (Hk1 + 2 * Hk2 + 2 * Hk3 + Hk4)

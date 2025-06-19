@@ -41,7 +41,7 @@ h_satellite3 = scatter3(data.X(13, 1), data.X(14, 1), data.X(15, 1), 100, 'Marke
 h_satellite4 = scatter3(data.X(19, 1), data.X(20, 1), data.X(21, 1), 100, 'MarkerEdgeColor', 'k', 'MarkerFaceColor', [0.4940 0.1840 0.5560]);
 
 % Add legend, and format ticks in LaTeX
-lgd = legend([h_orbit1, h_orbit2, h_orbit3, h_orbit4], {'$\mathcal{C}_1$', '$\mathcal{D}_1$', '$\mathcal{D}_2$', '$\mathcal{D}_3$'}, 'Interpreter', 'latex');
+lgd = legend([h_orbit1, h_orbit2, h_orbit3, h_orbit4], {'$\mathcal{S}_1$', '$\mathcal{S}_2$', '$\mathcal{S}_3$', '$\mathcal{S}_4$'}, 'Interpreter', 'latex');
 lgd.FontSize = 16; % Adjust font size
 lgd.Interpreter = 'latex'; % Set interpreter to latex
 lgd.Position(1) = 0.711666666666669;

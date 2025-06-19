@@ -1,7 +1,8 @@
+# src/main.py
+import os
+import sys
 import argparse
-
-from visualizer import run_visualizer
-from simulation import run_simulation, run_propagation
+import importlib.util
 
 
 class MatlabAction(argparse.Action):
@@ -21,10 +22,25 @@ def check_positive(value):
     return ivalue
 
 
+def load_config(config_path):
+    """Load a configuration file dynamically."""
+    spec = importlib.util.spec_from_file_location("config", config_path)
+    config_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(config_module)
+    return config_module.SimulationConfig
+
+
 def main():
     # Create argument parser
     parser = argparse.ArgumentParser(
         description="SpaceSim-Toolkit is an advanced, open-source simulation framework designed for space enthusiasts, researchers, and engineers. This versatile toolkit focuses on providing a robust platform for simulating spacecraft dynamics, orbital mechanics, and navigation algorithms in various space missions and scenarios."
+    )
+    parser.add_argument(
+        "-c",
+        "--config",
+        type=str,
+        default="config_files/_config_default.py",
+        help="Path to the configuration file to use (default: config_files/_config_default.py)",
     )
     parser.add_argument(
         "-v",
@@ -47,8 +63,31 @@ def main():
         "-a",
         "--algorithm",
         type=str,
-        choices=["wlstsq-lm", "fcekf", "hcmci", "ccekf", "cnkkt", "unkkt"],
-        help="Navigation algorithm to simulate (wlstsq-lm for WLSTSQ-LM, fcekf for FCEKF, hcmci for HCMCI, ccekf for CCEKF, cnkkt for CNKKT, or unkkt for UNKKT)",
+        choices=[
+            "lm",
+            "fcekf",
+            "hcmci",
+            "ccekf",
+            "newton",
+            "gauss-newton",
+            "tree-newton",
+            "approxA-newton",
+            "mm-newton",
+            "inewton",
+            "pcg-newton",
+        ],
+        help="""Orbit estimation algorithm framework:
+        lm: Levenberg-Marquardt applied to the weighted nonlinear least squares problem;
+        fcekf: fully centralized EKF;
+        hcmci: hybrid Consensus-based;
+        ccekf: Consider Covariance EKF;
+        newton: Newton's method;
+        gauss-newton: GaussNewton method;
+        tree-newton: Newton's method variant based on tree-structured Hessian;
+        approxA-newton: Newton's method variant based on approximated Hessian (tree-structured Hessian + diagonal elements from the residual Hessian);
+        mm-newton: Newton's method variant based on Majorization-Minimization for the cost function;
+        inewton: Newton's method variant based on an iterative method to solve the linear system;
+        pcg-newton: Newton's method variant based on Preconditioned Conjugate Gradient.""",
     )
     parser.add_argument(
         "-M",
@@ -66,6 +105,20 @@ def main():
 
     # Parse arguments
     args = parser.parse_args()
+
+    # Load the configuration
+    try:
+        config = load_config(args.config)
+        # Make config available globally
+        sys.modules["config"] = type("config", (), {"SimulationConfig": config})
+        print(f"Using config from: {args.config}")
+    except Exception as e:
+        print(f"Error loading configuration file: {e}")
+        sys.exit(1)
+
+    # Now that config is loaded, import the modules that need it
+    from visualizer import run_visualizer
+    from simulation import run_simulation, run_propagation
 
     # Run propagation
     if args.propagate and args.formation:
